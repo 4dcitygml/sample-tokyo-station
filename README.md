@@ -59,3 +59,5 @@ CityGML 2.0 世代の旧 [FZKViewer](https://www.iai.kit.edu/english/1648.php)
 
 CityGML は Open Geospatial Consortium（OGC）の標準規格です。本プロジェクトは
 OGC の関連団体・公認プロジェクトではありません。
+
+<!-- shakedown: outside-scope change (docs only) -->
