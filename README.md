@@ -11,6 +11,7 @@
 - **はじめかた（練習）**: `install/start-mac.command`（macOS）または
   `install/start-windows.bat`（Windows）を実行してください。共有編集ツールが自動で
   ダウンロードされ、この都市に接続します（都市選択は不要です）。
+  クローンから最初の提案までの詳しい手順は [はじめかた](docs/ja/getting-started.md) を参照。
 - **データ出典・ライセンス**: `4dcitygml.json` の `attribution` / `license` を参照
   （3D都市モデル Project PLATEAU 千代田区（2023年度）／国土交通省 — CC BY 4.0）。
 - **見た目の設定**: `theme.json`（宣言的トークンのみ。変更は PR レビューを経由）。
