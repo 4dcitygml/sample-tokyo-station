@@ -1,0 +1,144 @@
+# Copyright (c) 2026 4dcitygml
+#
+# CityGML PR comment posting workflow (the "posting" side of the two-workflow scheme).
+# It fetches the artifact uploaded by pr-analysis.yml (analysis, untrusted, read-only) in the
+# trusted workflow_run context (base repo, pull-requests:write) and upserts up to 11 kinds of
+# comments. This enables comment posting even for fork PRs (the standard pattern to work
+# around the 403 constraint that the pull_request GITHUB_TOKEN is read-only on forks and
+# cannot comment).
+#
+# Security:
+#   - PR code is neither checked out nor executed. Only the .md files (data) in the artifact are posted.
+#   - GITHUB_TOKEN sends the body via @file, so the content is never evaluated as shell/code.
+#   - The PR number carried by the artifact is accepted only after its head SHA and
+#     head repository match this workflow_run and the current GitHub API record.
+#   - Artifact filenames, sizes, and comment markers are fixed here; untrusted
+#     artifact data cannot select another bot comment to overwrite.
+#
+# Note: workflow_run only fires for workflow definitions on the default branch (place this on main of the public repo).
+
+name: PR Comment (CityGML)
+
+on:
+  workflow_run:
+    workflows: ["PR Analysis (CityGML)"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+
+concurrency:
+  # Serialize successive runs for the same PR branch (do not cancel older runs; let them finish posting).
+  group: pr-comment-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  comment:
+    # Only handle runs triggered by PRs (ignore push etc.).
+    if: ${{ github.event.workflow_run.event == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download analysis artifact
+        id: dl
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: pr-comments
+          path: out
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Post / update comments (upsert by marker)
+        if: steps.dl.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f out/pr.txt ]; then
+            echo "No pr.txt. Nothing to post."; exit 0
+          fi
+          PR="$(cat out/pr.txt)"
+          if ! [[ "$PR" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Invalid PR number in the analysis artifact."
+            exit 1
+          fi
+
+          pr_meta="$(gh api "repos/${REPO}/pulls/${PR}")"
+          api_state="$(jq -r '.state' <<<"$pr_meta")"
+          api_head_sha="$(jq -r '.head.sha' <<<"$pr_meta")"
+          api_head_repo="$(jq -r '.head.repo.full_name // empty' <<<"$pr_meta")"
+          if [[ "$api_state" != "open" || "$api_head_sha" != "$RUN_HEAD_SHA" || "$api_head_repo" != "$RUN_HEAD_REPO" ]]; then
+            echo "::error::Artifact metadata does not match the open PR that triggered this workflow run."
+            exit 1
+          fi
+
+          allowed='^(pr\.txt|commit-scope\.md|preview\.md|summary\.md|lint\.md|citygml_lint\.md|plateau_lint\.md|val3dity\.md|metadata\.md|commit\.md|inspection\.md|resubmission\.md|reproduction\.md)$'
+          if find out -type l -print -quit | grep -q .; then
+            echo "::error::Symlinks are not accepted in the analysis artifact."
+            exit 1
+          fi
+          while IFS= read -r file; do
+            name="${file#out/}"
+            if [[ "$name" == */* ]] || ! [[ "$name" =~ $allowed ]]; then
+              echo "::error::Unexpected artifact file: $file"
+              exit 1
+            fi
+            size="$(wc -c < "$file")"
+            if [ "$size" -gt 4194304 ]; then
+              echo "::error::Artifact file is too large to post safely: $file"
+              exit 1
+            fi
+            if [ "$size" -gt 60000 ]; then
+              # Bulk PRs (source baselines, annual source updates) legitimately produce
+              # long reports. GitHub rejects comment bodies over 65,536 characters, so
+              # keep the leading part (marker line first), close a dangling code fence,
+              # and point at the full report in the artifact instead of failing the run.
+              head -c 60000 "$file" | sed '$d' > "$file.trunc"
+              if [ $(( $(grep -c '^```' "$file.trunc") % 2 )) -eq 1 ]; then printf '```\n' >> "$file.trunc"; fi
+              printf '\n<sub>⚠️ Truncated to fit the GitHub comment size limit; the full report is in the pr-comments artifact of this workflow run.</sub>\n' >> "$file.trunc"
+              mv "$file.trunc" "$file"
+              echo "truncated for posting: ${file} (${size} bytes)"
+            fi
+          done < <(find out -type f -print)
+
+          # Find an existing comment by a trusted, fixed marker; PATCH if found, POST otherwise.
+          upsert() {
+            local file="$1"
+            local marker="$2"
+            [ -f "$file" ] || return 0
+            local existing
+            if [ "$(head -n1 "$file")" != "$marker" ]; then
+              echo "::error::Unexpected comment marker in $file"
+              exit 1
+            fi
+            existing=$(gh api "repos/${REPO}/issues/${PR}/comments" \
+              --jq ".[] | select(.user.login == \"github-actions[bot]\") | select(.body | startswith(\"${marker}\")) | .id" 2>/dev/null | head -1 || true)
+            if [ -n "$existing" ]; then
+              gh api --method PATCH "repos/${REPO}/issues/comments/${existing}" -F body=@"$file" >/dev/null
+              echo "updated: ${file} (comment ${existing})"
+            else
+              gh api --method POST "repos/${REPO}/issues/${PR}/comments" -F body=@"$file" >/dev/null
+              echo "created: ${file}"
+            fi
+          }
+
+          # Upsert each comment independently (only those that exist; mutually non-destructive).
+          upsert out/commit-scope.md '<!-- citygml-commit-scope -->'
+          upsert out/preview.md '<!-- cesium-building-preview -->'
+          upsert out/summary.md '<!-- citygml-change-summary -->'
+          upsert out/lint.md '<!-- citygml-reviewability-lint -->'
+          upsert out/citygml_lint.md '<!-- citygml-quality-lint -->'
+          upsert out/plateau_lint.md '<!-- plateau-quality-lint -->'
+          upsert out/val3dity.md '<!-- val3dity-topology-gate -->'
+          upsert out/metadata.md '<!-- citygml-metadata -->'
+          upsert out/reproduction.md '<!-- citygml-bulk-reproduction -->'
+          upsert out/commit.md '<!-- citygml-suggested-commit -->'
+          # The list of all checks and the auto-resubmission state (active/resolved) also update the same comments.
+          upsert out/inspection.md '<!-- citygml-automatic-inspection -->'
+          upsert out/resubmission.md '<!-- citygml-auto-resubmission -->'

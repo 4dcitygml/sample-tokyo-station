@@ -1,0 +1,93 @@
+# Copyright (c) 2026 4dcitygml
+#
+# When main is updated and when a PR is updated, check whether the PR contains the latest version.
+# PR code is neither checked out nor executed; only GitHub API SHA comparison and comment updates are performed.
+
+name: PR Base Freshness Comment
+
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-base-freshness-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check open PRs and update friendly guidance
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker='<!-- citygml-base-freshness -->'
+
+          update_pr() {
+            local pr="$1" meta base head behind existing file
+            meta=$(gh api "repos/${REPO}/pulls/${pr}")
+            if [ "$(jq -r '.draft' <<<"$meta")" = "true" ]; then
+              return 0
+            fi
+            base=$(jq -r '.base.sha' <<<"$meta")
+            head=$(jq -r '.head.sha' <<<"$meta")
+            if ! behind=$(gh api "repos/${REPO}/compare/${base}...${head}" --jq '.behind_by'); then
+              echo "PR #${pr}: could not fetch the comparison with the latest version; will recheck next time"
+              return 0
+            fi
+            if ! [[ "$behind" =~ ^[0-9]+$ ]]; then
+              echo "PR #${pr}: comparison result unknown; will recheck next time"
+              return 0
+            fi
+            existing=$(gh api "repos/${REPO}/issues/${pr}/comments?per_page=100" \
+              --jq ".[] | select(.user.login == \"github-actions[bot]\") | select(.body | startswith(\"${marker}\")) | .id" | head -1 || true)
+            file="/tmp/citygml-base-freshness-${pr}.md"
+
+            if [ "$behind" -gt 0 ]; then
+              {
+                echo "$marker"
+                echo '<!-- status:active -->'
+                echo '## 🔄 Please merge in the latest version'
+                echo ''
+                echo "After this proposal was created, ${behind} other change(s) were applied first."
+                echo 'To avoid losing your work, merge in the latest version and submit again.'
+                echo ''
+                echo '<sub>No reviewer action is needed. After the update, the automated checks run again.</sub>'
+              } > "$file"
+              if [ -n "$existing" ]; then
+                gh api --method PATCH "repos/${REPO}/issues/comments/${existing}" -F body=@"$file" >/dev/null
+              else
+                gh api --method POST "repos/${REPO}/issues/${pr}/comments" -F body=@"$file" >/dev/null
+              fi
+              echo "PR #${pr}: advised merging in the latest version"
+            elif [ -n "$existing" ]; then
+              {
+                echo "$marker"
+                echo '<!-- status:resolved -->'
+                echo '## ✅ Latest version merged'
+                echo ''
+                echo 'The changes are based on the latest published data.'
+              } > "$file"
+              gh api --method PATCH "repos/${REPO}/issues/comments/${existing}" -F body=@"$file" >/dev/null
+              echo "PR #${pr}: confirmed consistency with the latest version"
+            fi
+          }
+
+          if [ "$EVENT_NAME" = "pull_request_target" ]; then
+            update_pr "$EVENT_PR"
+          else
+            while IFS= read -r pr; do
+              [ -n "$pr" ] && update_pr "$pr"
+            done < <(gh api "repos/${REPO}/pulls?state=open&per_page=100" --jq '.[].number')
+          fi

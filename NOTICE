@@ -1,0 +1,44 @@
+sample-tokyo-station
+Copyright (c) 2026 4dcitygml
+
+Project code, configuration, CI workflows, and documentation are licensed
+under the Apache License 2.0 (LICENSE, Section A). The city dataset keeps its
+original CC BY 4.0 license (LICENSE, Section B).
+
+City dataset provenance
+-----------------------
+- Dataset: 3D都市モデル（Project PLATEAU）千代田区（2023年度）
+  — CityGML 2.0 with i-UR (uro) 3.0, package 13101_chiyoda-ku_pref_2023_citygml_1_op
+- Publisher: 国土交通省 (Ministry of Land, Infrastructure, Transport and
+  Tourism, Japan), Project PLATEAU; distributed via G空間情報センター
+  (https://front.geospatial.jp/, dataset plateau-13101-chiyoda-ku-2023)
+- Original license: CC BY 4.0
+- Attribution: 3D都市モデル（Project PLATEAU）千代田区（2023年度）／国土交通省 — CC BY 4.0
+- Acquired: 2026-08-21 (official distribution ZIP, approx. 1.98 GB; the ZIP
+  itself is not part of this repository)
+- Coordinate reference system: EPSG:6697 (unchanged from the original)
+- Stable building IDs: uro:buildingID (unchanged from the original)
+
+Modifications from the original distribution (changes were made):
+1. Subset extraction — only the Tokyo-Station third-level mesh 53394611 is
+   included (building GML, its appearance/texture directory with 3,124 JPG
+   files, code lists, metadata, and specification documents). The rest of the
+   ward-wide package is not included.
+2. Mesh split — the third-level mesh file 53394611_bldg_6697_op.gml was split
+   into four fourth-level mesh files (533946111–533946114_bldg_6697_op.gml)
+   to keep files reviewable in pull requests. Building contents, IDs, and the
+   appearance directory are unchanged by the split.
+3. Ongoing collaborative edits — buildings are updated through reviewed pull
+   requests; every change is recorded in the git history of this repository
+   (per-building commits with a Building: trailer). docs/provenance-rules.md
+   defines how sources are recorded inside the data.
+
+Texture images: the JPG texture files under
+13101_chiyoda-ku_pref_2023_citygml_1_op/udx/bldg/53394611_bldg_6697_appearance/
+are part of the original PLATEAU distribution (CC BY 4.0, same attribution).
+Newly contributed images must follow docs/data-contribution-policy.md
+(rights, no identifiable persons / plates, removal-request contact).
+
+This repository is a practice environment and is not affiliated with or
+endorsed by MLIT / Project PLATEAU. CityGML is a standard of the Open
+Geospatial Consortium (OGC); this project is not affiliated with OGC.

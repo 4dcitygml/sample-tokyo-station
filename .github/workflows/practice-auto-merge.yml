@@ -1,0 +1,122 @@
+# Copyright (c) 2026 4dcitygml
+#
+# Retained practice sandbox auto-merge implementation. It is disabled unless
+# PRACTICE_AUTO_MERGE_ENABLED is explicitly 1. When enabled and a PR touches ONLY the
+# enumerated practice data files, this workflow approves it and enables
+# auto-merge; GitHub then merges as soon as the required "analyze" check
+# (PR Analysis with STRICT_GATE=1) passes. No human review is involved —
+# the repository can be restored later by an explicitly confirmed manual reset.
+#
+# Security invariants (do not weaken):
+#   - pull_request_target, but the PR code is NEVER checked out or executed.
+#     The only inputs are file paths/statuses from the GitHub API.
+#   - The merge decision NEVER consumes analysis artifacts (a forged artifact
+#     must not become an approval input). Gate = branch protection required
+#     checks, which GitHub evaluates itself.
+#   - The path allowlist here matches .github/CODEOWNERS. CODEOWNERS +
+#     "Require review from Code Owners" is the hard second layer: even if this
+#     workflow mis-approved, a PR touching protected paths still cannot merge.
+#   - Requires the repo setting "Allow GitHub Actions to create and approve
+#     pull requests" and "Allow auto-merge" (see operator setup checklist).
+
+name: Practice auto-merge
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: practice-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  gatekeeper:
+    if: >-
+      github.repository == vars.PRACTICE_REPO &&
+      vars.PRACTICE_AUTO_MERGE_ENABLED == '1' &&
+      !github.event.pull_request.draft &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check paths, approve, enable auto-merge
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          DATA_DIR='13101_chiyoda-ku_pref_2023_citygml_1_op/udx/bldg'
+          GML_RE="^${DATA_DIR}/53394611[1-4]_bldg_6697_op\.gml$"
+          JPG_RE="^${DATA_DIR}/53394611_bldg_6697_appearance/[A-Za-z0-9][A-Za-z0-9._-]*\.jpg$"
+          MAX_FILES=200
+          marker='<!-- practice-scope-notice -->'
+
+          # File list straight from the API (never from artifacts, never from a checkout).
+          gh api "repos/${REPO}/pulls/${PR}/files" --paginate \
+            --jq '.[] | [.status, .filename] | @tsv' > /tmp/files.tsv
+
+          notice() {
+            # Upsert one explanatory comment instead of failing the job: out-of-scope
+            # PRs are not errors — they just go to the human-review path (CODEOWNERS).
+            local body file=/tmp/notice.md
+            {
+              echo "$marker"
+              echo "## 🙋 Outside the practice scope"
+              echo ""
+              echo "$1"
+              echo ""
+              echo "This practice sandbox auto-merges only edits to the four demo .gml tiles and new texture .jpg files. Everything else waits for a maintainer's review. / この練習リポで自動マージされるのはデモ用 .gml 4ファイルの編集と新規テクスチャ .jpg の追加だけです。それ以外はメンテナーのレビュー待ちになります。"
+            } > "$file"
+            existing=$(gh api "repos/${REPO}/issues/${PR}/comments?per_page=100" \
+              --jq ".[] | select(.user.login == \"github-actions[bot]\") | select(.body | startswith(\"${marker}\")) | .id" | head -1 || true)
+            if [ -n "$existing" ]; then
+              gh api --method PATCH "repos/${REPO}/issues/comments/${existing}" -F body=@"$file" >/dev/null
+            else
+              gh api --method POST "repos/${REPO}/issues/${PR}/comments" -F body=@"$file" >/dev/null
+            fi
+          }
+
+          total=$(wc -l < /tmp/files.tsv | tr -d ' ')
+          if [ "$total" -eq 0 ]; then
+            echo "No files in the PR; nothing to do."; exit 0
+          fi
+          if [ "$total" -gt "$MAX_FILES" ]; then
+            notice "The proposal changes ${total} files, which is beyond what the sandbox auto-merges (max ${MAX_FILES})."
+            exit 0
+          fi
+
+          ok=true
+          while IFS=$'\t' read -r status path; do
+            if [[ "$path" =~ $GML_RE ]] && [ "$status" = "modified" ]; then
+              continue
+            fi
+            if [[ "$path" =~ $JPG_RE ]] && [ "$status" = "added" ]; then
+              continue
+            fi
+            echo "out of scope: [$status] $path"
+            ok=false
+          done < /tmp/files.tsv
+
+          if [ "$ok" != "true" ]; then
+            notice "Some changed files are outside the auto-merge allowlist (see the workflow log for the list)."
+            exit 0
+          fi
+
+          # In scope: approve (satisfies the 1-approval requirement; stale
+          # approvals dismissed on push are re-granted here after re-validation)
+          # and enable auto-merge. GitHub itself performs the merge only after
+          # the required "analyze" check (STRICT_GATE) succeeds on HEAD.
+          gh api --method POST "repos/${REPO}/pulls/${PR}/reviews" \
+            -f event=APPROVE \
+            -f body="✅ Practice sandbox: all changed files are within the practice allowlist (verified against ${HEAD_SHA}). Auto-merge is enabled; the proposal merges automatically once the automated inspection passes." >/dev/null
+          # --auto waits for required checks. Never fall back to a direct merge.
+          # A second "already enabled" run is not an error worth failing on.
+          gh pr merge --auto --squash "$PR" --repo "$REPO" \
+            || echo "::warning::could not enable auto-merge (possibly already enabled); no direct merge was attempted"
+          echo "approved and auto-merge handling done for PR #${PR}"

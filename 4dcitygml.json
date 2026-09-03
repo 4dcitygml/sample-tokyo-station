@@ -1,0 +1,16 @@
+{
+  "id": "tokyo-station",
+  "name": { "en": "Tokyo Station demo", "ja": "東京駅デモ", "de": "Demo Tokio" },
+  "repo": "4dcitygml/sample-tokyo-station",
+  "logo": "logo.png",
+  "country": "JP",
+  "lang": "ja",
+  "edition": "iur-3.0",
+  "crs": "EPSG:6697",
+  "units": "m",
+  "building_id": { "type": "uro:buildingID" },
+  "data_dirs": ["13101_chiyoda-ku_pref_2023_citygml_1_op"],
+  "map": { "tiles": "gsi", "center": [35.6812, 139.7671], "zoom": 16 },
+  "attribution": "3D都市モデル（Project PLATEAU）千代田区（2023年度）／国土交通省 — CC BY 4.0",
+  "license": "CC-BY-4.0"
+}

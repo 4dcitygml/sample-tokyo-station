@@ -1,0 +1,64 @@
+# Copyright (c) 2026 4dcitygml
+# SPDX-License-Identifier: Apache-2.0
+# Re-run the existing read-only PR analysis when the submitter or a maintainer requests a re-inspection from the hub.
+# PR code is neither checked out nor executed in this trusted workflow.
+name: PR Analysis recheck request
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: pr-recheck-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  recheck:
+    if: >-
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '<!-- citygml-ci-retry-request -->')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authorize request and rerun current PR analysis
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REQUESTER: ${{ github.event.comment.user.login }}
+          ASSOCIATION: ${{ github.event.comment.author_association }}
+        run: |
+          set -euo pipefail
+          pr="$(gh api "repos/$REPO/pulls/$PR_NUMBER")"
+          author="$(jq -r '.user.login' <<<"$pr")"
+          state="$(jq -r '.state' <<<"$pr")"
+          head_sha="$(jq -r '.head.sha' <<<"$pr")"
+          if [[ "$state" != "open" ]]; then
+            echo "PR is closed; skipping re-inspection"
+            exit 1
+          fi
+          if [[ "$REQUESTER" != "$author" && ! "$ASSOCIATION" =~ ^(OWNER|MEMBER|COLLABORATOR)$ ]]; then
+            gh api "repos/$REPO/issues/$PR_NUMBER/comments" \
+              -f body="Only the proposer or a maintainer can request a re-inspection."
+            exit 1
+          fi
+
+          run_id="$(gh api --method GET \
+            "repos/$REPO/actions/workflows/pr-analysis.yml/runs" \
+            -f event=pull_request -f head_sha="$head_sha" -f per_page=30 \
+            --jq '[.workflow_runs[] | select(.status == "completed")] | sort_by(.created_at) | last | .id // empty')"
+          if [[ -z "$run_id" ]]; then
+            gh api "repos/$REPO/issues/$PR_NUMBER/comments" \
+              -f body="No re-runnable automated inspection record was found. Please contact a maintainer."
+            exit 1
+          fi
+
+          gh api --method POST "repos/$REPO/actions/runs/$run_id/rerun"
+          gh api "repos/$REPO/issues/$PR_NUMBER/comments" \
+            -f body="🔄 The automated inspection was started again. Please wait a few minutes for the results."

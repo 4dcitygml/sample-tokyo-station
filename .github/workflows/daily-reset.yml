@@ -1,0 +1,164 @@
+# Copyright (c) 2026 4dcitygml
+#
+# Practice sandbox reset. The reset implementation is retained for a future
+# scheduled operation, but currently runs only by an explicit manual dispatch.
+#
+# Requirements (see the operator setup checklist):
+#   - a `baseline` branch holding the pristine demo state (update-blocked)
+#   - RESET_TOKEN: a short-lived, repository-scoped fine-grained owner PAT with
+#     contents write, authorized only for this explicitly confirmed reset
+
+name: Manual practice reset
+
+on:
+  # Reserved for a future decision to resume scheduled resets:
+  # schedule:
+  #   - cron: "0 18 * * *"   # 18:00 UTC = 03:00 JST
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type RESET to reset main to baseline'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: daily-reset
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    # Fail-closed guard: runs only where the PRACTICE_REPO repository variable is set
+    # to this repo's own owner/name (forks and copies do not have it -> inert).
+    if: >-
+      github.repository == vars.PRACTICE_REPO &&
+      inputs.confirmation == 'RESET'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RESET_TOKEN }}
+
+      - name: Refuse to reset while a pull request is open
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          open_prs="$(gh api "repos/${REPO}/pulls?state=open&per_page=1" --jq 'length')"
+          if [ "$open_prs" -ne 0 ]; then
+            echo "::error::An open pull request exists. Review or close it before resetting."
+            exit 1
+          fi
+
+      - name: Archive today's practice activity (research log, before reset)
+        # Optional: set the PRACTICE_ARCHIVE_REPO variable (e.g. 4dcitygml/practice-log,
+        # a PRIVATE repo) + the ARCHIVE_TOKEN secret (fine-grained PAT, contents RW on
+        # that repo only) to keep a daily log of practice activity: merged patches,
+        # PRs, reviews and all comments (including CI's own — the tuning source).
+        # Only the squash commits on main truly evaporate at reset; PRs/comments
+        # survive on GitHub, so a failed archive is a warning, not a blocker.
+        if: vars.PRACTICE_ARCHIVE_REPO != ''
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ARCHIVE_REPO: ${{ vars.PRACTICE_ARCHIVE_REPO }}
+          ARCHIVE_TOKEN: ${{ secrets.ARCHIVE_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ARCHIVE_TOKEN" ]; then
+            echo "::warning::PRACTICE_ARCHIVE_REPO is set but ARCHIVE_TOKEN is missing; skipping the archive."
+            exit 0
+          fi
+          CUTOFF="$(date -u -d '25 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
+          DAY="$(date -u +%F)"
+          DEST="$RUNNER_TEMP/practice-archive"
+          git clone --depth 1 "https://x-access-token:${ARCHIVE_TOKEN}@github.com/${ARCHIVE_REPO}.git" "$DEST"
+          # Per-repo subfolder: the three practice cities share one archive repo.
+          DIR="$DEST/logs/${REPO#*/}/$DAY"
+          mkdir -p "$DIR"
+
+          # The day's merged practice edits (the only data the reset destroys).
+          git fetch --no-tags origin baseline main
+          git format-patch --stdout origin/baseline..origin/main > "$DIR/merged.patch" || true
+          [ -s "$DIR/merged.patch" ] || rm -f "$DIR/merged.patch"
+
+          # PRs updated in the window (state=all: auto-merged, rejected, still open).
+          gh api "repos/${REPO}/pulls?state=all&sort=updated&direction=desc&per_page=100" \
+            --paginate --jq ".[] | select(.updated_at >= \"${CUTOFF}\")" \
+            | jq -s '.' > "$DIR/prs.json"
+
+          # Every comment in the window — user posts AND the bot/CI upserts
+          # (inspection tables, resubmission requests, scope notices).
+          gh api "repos/${REPO}/issues/comments?since=${CUTOFF}&per_page=100" \
+            --paginate --jq '.[]' | jq -s '.' > "$DIR/comments.json"
+
+          # Reviews (the auto-approve trail) for the PRs captured above.
+          : > /tmp/reviews.ndjson
+          while IFS= read -r n; do
+            [ -n "$n" ] || continue
+            gh api "repos/${REPO}/pulls/${n}/reviews?per_page=100" --paginate \
+              --jq '.[]' | jq --argjson pr "$n" '. + {pr_number: $pr}' >> /tmp/reviews.ndjson || true
+          done < <(jq -r '.[].number' "$DIR/prs.json")
+          jq -s '.' /tmp/reviews.ndjson > "$DIR/reviews.json"
+
+          {
+            echo "# Practice log ${REPO#*/} ${DAY}"
+            echo ""
+            echo "- window since: ${CUTOFF} (UTC)"
+            echo "- PRs updated: $(jq 'length' "$DIR/prs.json") (merged: $(jq '[.[] | select(.merged_at != null)] | length' "$DIR/prs.json"))"
+            echo "- comments captured: $(jq 'length' "$DIR/comments.json")"
+            echo "- merged.patch: $([ -f "$DIR/merged.patch" ] && echo yes || echo "none (no merges today)")"
+          } > "$DIR/summary.md"
+
+          cd "$DEST"
+          git config user.name "practice-log[bot]"
+          git config user.email "actions@users.noreply.github.com"
+          git add logs
+          if git diff --cached --quiet; then
+            echo "nothing to archive today"
+          else
+            TZ=UTC git commit -m "practice log ${REPO#*/} ${DAY}"
+            git push
+            echo "archived to ${ARCHIVE_REPO}/logs/${REPO#*/}/${DAY}"
+          fi
+
+      - name: Rewind main to baseline
+        id: rewind
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin baseline main
+          BASELINE="$(git rev-parse origin/baseline)"
+          MAIN="$(git rev-parse origin/main)"
+          if [ "$BASELINE" = "$MAIN" ]; then
+            echo "main already equals baseline; nothing to reset."
+            echo "reset=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git push --force-with-lease="refs/heads/main:${MAIN}" origin "${BASELINE}:refs/heads/main"
+          echo "main rewound: ${MAIN} -> ${BASELINE}"
+          echo "reset=true" >> "$GITHUB_OUTPUT"
+
+      - name: Close open practice PRs with a friendly note
+        # Close PRs on every scheduled run (even when main was already clean,
+        # stale un-merged PRs from previous days should not linger).
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r pr; do
+            [ -n "$pr" ] || continue
+            gh api "repos/${REPO}/issues/${pr}/comments" -f body="🧹 **Daily reset** — this practice repository is rewound to its pristine state once a day (03:00 JST), so this open proposal is being closed. Nothing is wrong with your work: feel free to practice again anytime. Before you do, please **sync your fork** (the \"Sync fork\" button, discarding your fork's old commits) so yesterday's wiped edits don't leak into your next proposal — the official editing tool does this automatically at startup. / この練習リポジトリは毎日03:00 (JST) に初期状態へ巻き戻されるため、この提案はクローズされます。作業に問題があったわけではありません。次に練習する前に **fork の同期**（Sync fork ボタンで fork 側の古いコミットを破棄）をお願いします。同期しないと、巻き戻しで消えた前日の編集が次の提案に混入します（公式編集ツールを使う場合は起動時に自動同期されるため、この操作は不要です）。" >/dev/null
+            gh api --method PATCH "repos/${REPO}/pulls/${pr}" -f state=closed >/dev/null
+            echo "closed PR #${pr}"
+          done < <(gh api "repos/${REPO}/pulls?state=open&per_page=100" --paginate --jq '.[].number')

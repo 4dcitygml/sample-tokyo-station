@@ -1,0 +1,158 @@
+# Copyright (c) 2026 4dcitygml
+#
+# CityGML PR analysis — thin wrapper (the "analysis" side of the two-workflow scheme).
+#
+# This workflow intentionally contains no analysis logic. It checks out the
+# shared CI logic from the 4dcitygml/tools repository (overridable, see env) at a pinned MAJOR tag and runs the
+# drivers in ci/ from that checkout. Backward-compatible fixes ship by the
+# tools side moving the v1 tag (they reach every city repository on the next
+# run, no action needed here). Breaking changes ship as v2: each city
+# repository opts in at its own time by editing CITYGML_TOOLS_REF below.
+#
+# NEVER point CITYGML_TOOLS_REF at a branch (main) or at "latest": that turns
+# updates implicit and unreviewable. Use a major tag (v1); municipalities that
+# need hard immutability can pin a commit SHA instead.
+#
+# Security model (unchanged from the original two-workflow scheme):
+#   - runs on untrusted code from fork PRs -> permissions are contents:read
+#     only; results are uploaded as the "pr-comments" artifact and posted by
+#     pr-comment.yml (workflow_run, trusted side).
+#   - the tools checkout is a public, tag-pinned repository; it is data +
+#     scripts for this job only.
+
+name: PR Analysis (CityGML)
+
+on:
+  pull_request:
+    # labeled/unlabeled: re-evaluate when a maintainer adds/removes labels such as texture-override.
+    types: [opened, synchronize, reopened, ready_for_review, edited, labeled, unlabeled]
+
+concurrency:
+  group: pr-analysis-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Shared CI logic lives in the 4dcitygml/tools repository. City repositories hosted
+  # outside the 4dcitygml organization (a municipality's own org, a fork) keep using it
+  # unchanged; set the repository variable CITYGML_TOOLS_REPO only to point at your own
+  # audited mirror of tools (owner/name).
+  CITYGML_TOOLS_REPO: ${{ vars.CITYGML_TOOLS_REPO || '4dcitygml/tools' }}
+  CITYGML_TOOLS_REF: 701afe67e2ddd5da71d1e803217bc0d38f0a9db4   # major tag (see header). SHA-pinning is also fine.
+
+jobs:
+  analyze:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    env:
+      TOOLS_DIR: ${{ github.workspace }}/.citygml-ci
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Pin the exact head commit from the event, not the branch name: checking
+          # out the immutable SHA removes the window where a post-event force-push
+          # could swap the analyzed tree (fork code is data here, never executed).
+          ref: ${{ github.event.pull_request.head.sha }}
+          # No credential is needed after checkout (public repo; base is fetched
+          # anonymously below). Do not leave the token in .git/config while
+          # untrusted fork data is processed in this job.
+          persist-credentials: false
+          # Do not use a shallow clone: every commit in base..head is inspected individually.
+          fetch-depth: 0
+
+      - name: Fetch base history (for diff / first-building inspection history)
+        # Do not shallow-fetch base: the "first time" for each building is determined from past commit-trailer history.
+        run: git fetch --no-tags origin ${{ github.event.pull_request.base.sha }}
+
+      - name: Fetch shared CI logic (tag-pinned)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: ${{ env.CITYGML_TOOLS_REPO }}
+          ref: ${{ env.CITYGML_TOOLS_REF }}
+          path: .citygml-ci
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies (lxml + xmlschema, pinned)
+        run: python -m pip install --quiet "lxml==6.1.1" "xmlschema==4.3.2"
+
+      - name: Run analysis driver
+        id: main
+        env:
+          PREVIEW_BASE_URL: ${{ vars.PREVIEW_BASE_URL }}
+        run: bash "$TOOLS_DIR/ci/pr_analysis_main.sh"
+
+      # --- Topological consistency gate (official engine val3dity, differential, advisory) ---
+      # Toolchain setup stays in the wrapper because actions/cache cannot run
+      # inside a script. The gate itself lives in ci/topology_gate.sh.
+      - name: Set up Java (for citygml-tools)
+        if: steps.main.outputs.run == 'true'
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install pyproj (reprojection for val3dity)
+        if: steps.main.outputs.run == 'true'
+        run: python -m pip install --quiet "pyproj==3.6.1"
+
+      - name: Cache val3dity toolchain
+        if: steps.main.outputs.run == 'true'
+        id: v3dcache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/tools/citygml-tools-2.5.0
+            ~/tools/val3dity
+          key: v3d-toolchain-ct250-val3dity260-ubuntu2404
+
+      - name: Build val3dity + fetch citygml-tools (cache miss only)
+        if: steps.main.outputs.run == 'true' && steps.v3dcache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/tools && cd ~/tools
+          curl -fsSL -o ct.zip https://github.com/citygml4j/citygml-tools/releases/download/v2.5.0/citygml-tools-2.5.0.zip
+          unzip -q ct.zip
+          # Build val3dity (pinned 2.6.0) from source (dependencies identical to the official build.yml).
+          sudo apt-get update
+          sudo apt-get install -y libgmp-dev libmpfr-dev libboost-all-dev libeigen3-dev libgeos-dev
+          curl -fsSL -o cgal.tar.xz https://github.com/CGAL/cgal/releases/download/v5.6.1/CGAL-5.6.1-library.tar.xz
+          tar -xf cgal.tar.xz
+          git clone --depth 1 --branch 2.6.0 https://github.com/tudelft3d/val3dity.git v3dsrc
+          cd v3dsrc && mkdir build && cd build
+          cmake .. -DCGAL_DIR="$HOME/tools/CGAL-5.6.1" -DCMAKE_BUILD_TYPE=Release && make -j4
+          cp val3dity "$HOME/tools/val3dity"
+
+      - name: "Topology gate (val3dity, differential, advisory)"
+        if: steps.main.outputs.run == 'true'
+        env:
+          # The gate extracts the changed buildings -> reprojects -> CityJSON -> val3dity. Missing tools auto-skip (advisory).
+          CITYGML_TOOLS: /home/runner/tools/citygml-tools-2.5.0/citygml-tools
+          VAL3DITY_CMD: /home/runner/tools/val3dity
+        run: bash "$TOOLS_DIR/ci/topology_gate.sh"
+
+      - name: Build automatic inspection summary and resubmission request
+        if: always()
+        env:
+          # STRICT_GATE=1 (practice repos, via repo variable): "❌ Needs attention"
+          # turns this job red so branch protection can use it as a merge gate.
+          STRICT_GATE: ${{ vars.CITYGML_STRICT_GATE }}
+        run: bash "$TOOLS_DIR/ci/inspection_summary.sh"
+
+      - name: Upload comment bodies (consumed by pr-comment.yml)
+        if: always()
+        # Even if the GitHub Actions artifact storage quota is exhausted, do not treat the
+        # analysis itself as failed. The posting side safely skips when the artifact is missing.
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pr-comments
+          path: out
+          if-no-files-found: warn
+          retention-days: 3
