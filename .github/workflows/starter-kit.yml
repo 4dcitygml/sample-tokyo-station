@@ -1,0 +1,87 @@
+# Copyright (c) 2026 4dcitygml
+# SPDX-License-Identifier: Apache-2.0
+#
+# Starter kit: a small zip (the install/ starters, the pinned tools release manifest and
+# 4dcitygml.json) attached to the fixed release tag "starter-kit". Residents download this
+# instead of the whole repository; the hub creates their copy of the city itself.
+# Rebuilt whenever the starters, the manifest or the city configuration change on main.
+# The zip is built with Python's zipfile so the .command keeps its execute bit.
+name: Starter kit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'install/**'
+      - '4dcitygml.json'
+      - '.github/workflows/starter-kit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # create / update the "starter-kit" release and its asset
+
+concurrency:
+  group: starter-kit
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # The template repository ships 4dcitygml.json.example only; a city fills in 4dcitygml.json.
+    if: ${{ hashFiles('4dcitygml.json') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Build the starter kit (fail-closed on an unfilled manifest)
+        shell: python
+        run: |
+          import hashlib, json, os, pathlib, zipfile
+
+          cfg = json.load(open("4dcitygml.json", encoding="utf-8"))
+          manifest = json.load(open("install/tools-release.json", encoding="utf-8"))
+          for key in ("tag", "windows", "macos"):
+              if not manifest.get(key):
+                  raise SystemExit("install/tools-release.json is not filled in; not publishing a starter kit")
+          city = cfg["id"]
+          root = f"{city}-starter"
+          files = [
+              ("install/start-mac.command", 0o755),
+              ("install/start-windows.bat", 0o644),
+              ("install/start-windows.ps1", 0o644),
+              ("install/tools-release.json", 0o644),
+              ("4dcitygml.json", 0o644),
+          ]
+          logo = cfg.get("logo")
+          if logo and pathlib.Path(logo).is_file():
+              files.append((logo, 0o644))
+          out = pathlib.Path(f"{root}.zip")
+          with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+              for src, mode in files:
+                  info = zipfile.ZipInfo(f"{root}/{pathlib.Path(src).name}")
+                  info.external_attr = (mode & 0xFFFF) << 16
+                  info.compress_type = zipfile.ZIP_DEFLATED
+                  z.writestr(info, pathlib.Path(src).read_bytes())
+          digest = hashlib.sha256(out.read_bytes()).hexdigest()
+          notes = (
+              f"Starter kit for **{cfg['name'].get('en', city)}** (`{cfg['repo']}`).\n\n"
+              "Unzip, then double-click `start-mac.command` (macOS) or `start-windows.bat` (Windows). "
+              f"The starter downloads the pinned tools release `{manifest['tag']}` and verifies its SHA-256 "
+              "before anything runs; the hub then creates your own copy of the city.\n\n"
+              f"```\n{digest}  {out.name}\n```\n"
+          )
+          pathlib.Path("notes.md").write_text(notes, encoding="utf-8")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+              fh.write(f"zip={out.name}\n")
+          print(f"{out.name} sha256={digest} entries={len(files)}")
+        id: kit
+      - name: Publish to the fixed release "starter-kit"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ZIP: ${{ steps.kit.outputs.zip }}
+        run: |
+          if ! gh release view starter-kit >/dev/null 2>&1; then
+            gh release create starter-kit --title "Starter kit" --notes-file notes.md --latest=false
+          fi
+          gh release upload starter-kit "$ZIP" --clobber
+          gh release edit starter-kit --notes-file notes.md

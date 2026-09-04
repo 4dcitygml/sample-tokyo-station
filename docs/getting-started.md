@@ -13,48 +13,55 @@ For the rules that proposals must follow, see the [PR operations guide](pr-opera
 and the [source recording rules](provenance-rules.md). For what may be contributed,
 see the [data contribution policy](data-contribution-policy.md).
 
-## 1. What you need
+## 1. Quick start: download the starter kit
 
-- A free GitHub account. You will sign in once; the tools remember it.
-- macOS 12 or later, or Windows 10 or later.
-- macOS only: Apple's command line tools (`git` and `python3`). If a dialog offers to
-  install them the first time you run the starter, accept it; no other installation is
-  needed. Windows needs nothing: Git and Python travel inside the download.
-- About 400 MB of disk space (tools plus your copy of the city data).
+You do not need Git, a GitHub account, or a copy of the city data to begin. The
+tools guide you through everything that is missing.
 
-## 2. Get this repository
-
-Either of these works:
-
-- **Clone** (recommended if you have Git):
-
-  ```bash
-  git clone <URL of this repository>
-  ```
-
-- **Download**: on the repository page choose *Code → Download ZIP* and unzip it.
-
-You now have a folder with `install/`, `4dcitygml.json`, and the city data.
-
-## 3. Start the tools
-
-- macOS: double-click `install/start-mac.command`. If macOS says the file is from an
-  unidentified developer, right-click it and choose *Open*. If it asks whether the
-  terminal may access your Documents folder, allow it.
-- Windows: double-click `install/start-windows.bat`. If SmartScreen appears, choose
-  *More info* and then *Run anyway*.
+1. Download the **starter kit** linked from this repository's README (the *Get
+   started* bullet). It is a small zip with the starter scripts and this city's
+   configuration.
+2. Unzip it. You get a folder such as `<city>-starter/`.
+3. Start:
+   - macOS: double-click `start-mac.command`. If macOS says the file is from an
+     unidentified developer, right-click it and choose *Open*. If it asks whether the
+     terminal may access your Documents folder, allow it.
+   - Windows: double-click `start-windows.bat`. If SmartScreen appears, choose
+     *More info* and then *Run anyway*.
 
 What happens, in order:
 
-1. The starter reads `install/tools-release.json`, which pins the exact tools release
-   (tag, file name, SHA-256).
+1. The starter reads `tools-release.json`, which pins the exact tools release (tag,
+   file name, SHA-256).
 2. It downloads that release from the `4dcitygml/tools` releases page and verifies the
    checksum. If the checksum does not match, nothing is extracted and the starter stops.
 3. The tools are extracted to `~/Documents/citygml-tools/citygml-hub/`.
 4. The hub opens in your browser at `http://localhost:8760/`, already connected to this
    city. Keep the terminal window open while you work; closing it stops the tools.
 
-The download happens only the first time. Later starts skip straight to step 4.
+The download happens only the first time. Later starts skip straight to step 4. Your
+own copy of the city data is created by the hub in the next section; you never have to
+download the repository yourself.
+
+## 2. What you need
+
+- macOS 12 or later, or Windows 10 or later.
+- macOS only: Apple's command line tools (`git` and `python3`). If macOS offers to
+  install them the first time you run the starter, accept it. If the hub later reports
+  that a component for the import is missing, follow `READ-ME-FIRST.html` in the
+  extracted tools folder and start again; setup resumes where it stopped. Windows
+  needs nothing: Git and Python travel inside the download.
+- About 400 MB of disk space (tools plus your copy of the city data).
+- A GitHub account is created, if you do not have one, during the *Connect* step
+  below (free; an email address and a password).
+
+## 3. Already using Git or GitHub? See the end of this guide
+
+The starter kit is the simplest way in for everyone, including developers. If you
+prefer to work with Git and GitHub directly, or want to build your own tool, read
+[Advanced: Git, GitHub, and your own tools](#advanced-git-github-and-your-own-tools)
+after the walkthrough. The rules that proposals must satisfy are the same in every
+case.
 
 ## 4. Initial setup in the hub (three steps)
 
@@ -81,8 +88,8 @@ After setup the hub lists the tools and your proposals:
 - **Attribute Editor**: view and edit building attributes from a map, then send a
   proposal.
 - **Texture Editor**: replace or add facade textures (only where the city has them).
-- **Your proposals**: the pull requests you sent, with the result of the automated
-  checks and the reviewer's status.
+- **Your contributions**: the proposals (and issues) you sent, with the result of the
+  automated checks and the reviewer's status.
 
 Each tool opens in a new browser tab on its own local port. The hub also shows where
 your working copy is.
@@ -100,7 +107,8 @@ In the Attribute Editor:
    pre-submission check run (one target building, valid XML, only building data
    changed, sources recorded).
 6. The proposal is created on this repository with a generated title and description
-   in the repository's working language, and the hub opens it.
+   in the repository's working language. The editor shows a *View your submission on
+   GitHub* link; the hub lists it under your contributions.
 
 Within a few minutes the automated checks comment on the proposal: a change summary, a
 reviewability check, and a table of thirteen gates. Items marked as needing attention
@@ -145,3 +153,27 @@ To remove everything, delete those items and revoke *4dcitygml hub* under
 *Settings → Applications → Authorized OAuth Apps* on GitHub. Your fork and any
 proposals you sent remain on GitHub; delete the fork from its settings page if you
 no longer want it.
+
+## Advanced: Git, GitHub, and your own tools
+
+Everything the hub does is ordinary Git and GitHub, so you may skip the hub entirely.
+
+- **Clone and branch by hand.** `git clone` this repository (or your fork), edit the
+  CityGML with any editor, commit, and open a pull request. Every GitHub feature is
+  available to you: forks, branches, the web editor, Codespaces, the API, the CLI,
+  Actions on your fork.
+- **The rules live in the pull request, not in the tool.** The automated checks apply
+  the same thirteen gates to every proposal, however it was made. Before your first
+  manual proposal read the [PR operations guide](pr-operations.md) (one change = one
+  building, commit trailers, the reason section, byte-preserving edits), the
+  [source recording rules](provenance-rules.md), and the machine-readable
+  [PR Exchange Contract](https://github.com/4dcitygml/tools/blob/main/docs/exchange-contract.md),
+  which states exactly what CI enforces and offers a local checker that runs the same
+  code as CI.
+- **Build your own tool.** Any program that produces proposals satisfying the contract is
+  welcome, from a script to a full editor or a QGIS plugin. Add a `Created-By:` trailer
+  so maintainers can tell clients apart, use the practice repositories as your sandbox,
+  and tell us about it in an issue on `4dcitygml/tools`.
+- **Where the hub's copy lives.** If you also use the hub, its working copy is the clone
+  under `~/Documents/CityGML Data/`; the hub reads the connected city from the clone's
+  `origin` remote, so pointing that clone at another fork or branch works as expected.

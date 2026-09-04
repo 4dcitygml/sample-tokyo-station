@@ -8,10 +8,11 @@
 協働管理しています。**このリポジトリは必要時に初期状態へ戻す練習用サンドボックスです** —
 本番の都市データに参加する前に、編集ツールと PR の流れを安心して学べます。
 
-- **はじめかた（練習）**: `install/start-mac.command`（macOS）または
-  `install/start-windows.bat`（Windows）を実行してください。共有編集ツールが自動で
-  ダウンロードされ、この都市に接続します（都市選択は不要です）。
-  クローンから最初の提案までの詳しい手順は [はじめかた](docs/ja/getting-started.md) を参照。
+- **はじめかた（練習）**: [スターターキット](https://github.com/4dcitygml/sample-tokyo-station/releases/download/starter-kit/tokyo-station-starter.zip)
+  をダウンロードして展開し、`start-mac.command`（macOS）または `start-windows.bat`（Windows）を
+  ダブルクリックしてください。共有編集ツールが自動でダウンロードされ、この都市に接続します。
+  リポジトリのクローンは不要です（自分用のコピーはツールが作ります）。
+  詳しい手順と、Git を直接使う方法は [はじめかた](docs/ja/getting-started.md) を参照。
 - **データ出典・ライセンス**: `4dcitygml.json` の `attribution` / `license` を参照
   （3D都市モデル Project PLATEAU 千代田区（2023年度）／国土交通省 — CC BY 4.0）。
 - **見た目の設定**: `theme.json`（宣言的トークンのみ。変更は PR レビューを経由）。
