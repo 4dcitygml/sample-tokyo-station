@@ -23,9 +23,11 @@ tools guide you through everything that is missing.
    configuration.
 2. Unzip it. You get a folder such as `<city>-starter/`.
 3. Start:
-   - macOS: double-click `start-mac.command`. If macOS says the file is from an
-     unidentified developer, right-click it and choose *Open*. If it asks whether the
-     terminal may access your Documents folder, allow it.
+   - macOS: double-click `start-mac.command`. macOS blocks it the first time: on
+     macOS 15 or later open *System Settings → Privacy & Security*, click *Open Anyway*
+     next to the message about the file, then double-click again; on older versions
+     right-click the file and choose *Open*. If it asks whether the terminal may access
+     your Documents folder, allow it.
    - Windows: double-click `start-windows.bat`. If SmartScreen appears, choose
      *More info* and then *Run anyway*.
 
@@ -39,7 +41,9 @@ What happens, in order:
 4. The hub opens in your browser at `http://localhost:8760/`, already connected to this
    city. Keep the terminal window open while you work; closing it stops the tools.
 
-The download happens only the first time. Later starts skip straight to step 4. Your
+The download happens the first time and again whenever the city pins a newer tools
+release; the starter then replaces the old copy after verifying the new one. Otherwise
+later starts skip straight to step 4. Your
 own copy of the city data is created by the hub in the next section; you never have to
 download the repository yourself.
 
@@ -132,7 +136,7 @@ them freely before working on a real city.
 ## 9. Troubleshooting
 
 - *Port 8760 is already in use*: another hub is running. Close it or pass another
-  port: `python3 ~/Documents/citygml-tools/citygml-hub/program/hub.py --port 8761`.
+  port (macOS example): `python3 ~/Documents/citygml-tools/citygml-hub/program/hub.py --port 8761`.
 - *SHA-256 mismatch*: the download was corrupted or altered. Run the starter again;
   if it keeps failing, report it through the channels in the organization's
   [SUPPORT.md](https://github.com/4dcitygml/.github/blob/main/SUPPORT.md).

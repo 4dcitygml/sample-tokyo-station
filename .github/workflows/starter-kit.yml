@@ -26,14 +26,19 @@ concurrency:
 
 jobs:
   build:
-    # The template repository ships 4dcitygml.json.example only; a city fills in 4dcitygml.json.
-    if: ${{ hashFiles('4dcitygml.json') != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+      # The template repository ships 4dcitygml.json.example only; a city fills in 4dcitygml.json.
+      # (hashFiles() is only available in step conditions, after the checkout.)
+      - name: Check that this is a configured city repository
+        id: city
+        run: |
+          if [ -f 4dcitygml.json ]; then echo "configured=true" >> "$GITHUB_OUTPUT"; else echo "No 4dcitygml.json; nothing to publish."; fi
       - name: Build the starter kit (fail-closed on an unfilled manifest)
+        if: steps.city.outputs.configured == 'true'
         shell: python
         run: |
           import hashlib, json, os, pathlib, zipfile
@@ -52,9 +57,6 @@ jobs:
               ("install/tools-release.json", 0o644),
               ("4dcitygml.json", 0o644),
           ]
-          logo = cfg.get("logo")
-          if logo and pathlib.Path(logo).is_file():
-              files.append((logo, 0o644))
           out = pathlib.Path(f"{root}.zip")
           with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
               for src, mode in files:
@@ -63,8 +65,10 @@ jobs:
                   info.compress_type = zipfile.ZIP_DEFLATED
                   z.writestr(info, pathlib.Path(src).read_bytes())
           digest = hashlib.sha256(out.read_bytes()).hexdigest()
+          name = cfg.get("name")
+          label = name.get("en") or next(iter(name.values()), city) if isinstance(name, dict) else (name or city)
           notes = (
-              f"Starter kit for **{cfg['name'].get('en', city)}** (`{cfg['repo']}`).\n\n"
+              f"Starter kit for **{label}** (`{cfg['repo']}`).\n\n"
               "Unzip, then double-click `start-mac.command` (macOS) or `start-windows.bat` (Windows). "
               f"The starter downloads the pinned tools release `{manifest['tag']}` and verifies its SHA-256 "
               "before anything runs; the hub then creates your own copy of the city.\n\n"
@@ -76,6 +80,7 @@ jobs:
           print(f"{out.name} sha256={digest} entries={len(files)}")
         id: kit
       - name: Publish to the fixed release "starter-kit"
+        if: steps.city.outputs.configured == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           ZIP: ${{ steps.kit.outputs.zip }}

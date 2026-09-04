@@ -6,8 +6,9 @@
 # (one commit per building), identity changes, whole-file official baselines
 # and manifest-backed bulk updates all appear on one timeline per building.
 #
-# Manual dispatch only: enable GitHub Pages (Source: GitHub Actions) for the
-# repository first, then run this workflow after merges you want reflected.
+# Runs on every push to main (merged proposals, baseline updates, README edits)
+# and on manual dispatch. GitHub Pages (Source: GitHub Actions) must be enabled
+# for the repository first; until then the deploy step fails harmlessly.
 # The published site is the repository content (so the CityGML preview URLs
 # under https://<owner>.github.io/<repo>/... keep working exactly as with the
 # "main / root" source) plus the generated index under /history/.
@@ -17,6 +18,8 @@
 name: Building history index (Pages)
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -35,12 +38,20 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.city.outputs.configured }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0          # the whole history is the input
           persist-credentials: false
+      # The template repository has no 4dcitygml.json (and no Pages); every later step is skipped there.
+      - name: Check that this is a configured city repository
+        id: city
+        run: |
+          if [ -f 4dcitygml.json ]; then echo "configured=true" >> "$GITHUB_OUTPUT"; else echo "No 4dcitygml.json; nothing to publish."; fi
       - name: Fetch shared logic (pinned)
+        if: steps.city.outputs.configured == 'true'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: ${{ env.CITYGML_TOOLS_REPO }}
@@ -48,20 +59,26 @@ jobs:
           path: .citygml-ci
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        if: steps.city.outputs.configured == 'true'
         with:
           python-version: "3.12"
       - run: python -m pip install --quiet "lxml==6.1.1" "shapely==2.1.2"
+        if: steps.city.outputs.configured == 'true'
       - name: Assemble the site (repository content + history index)
+        if: steps.city.outputs.configured == 'true'
         run: |
           mkdir -p site
           rsync -a --exclude '.git/' --exclude '.github/' --exclude '.citygml-ci/' --exclude 'site/' ./ site/
           python .citygml-ci/scripts/building_history.py --repo . --rev "${GITHUB_SHA}" --index-out site/history
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+        if: steps.city.outputs.configured == 'true'
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        if: steps.city.outputs.configured == 'true'
         with:
           path: site
   deploy:
     needs: build
+    if: needs.build.outputs.configured == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

@@ -31,8 +31,10 @@ fi
 
 DEST="$HOME/Documents/citygml-tools"
 APP="$DEST/citygml-hub/program/hub.py"
-if [ ! -f "$APP" ]; then
-  echo "Downloading the editing tool ($TAG)..."
+MARK="$DEST/citygml-hub/.release-tag"   # tag of the installed release; a different pin triggers an update
+INSTALLED="$(cat "$MARK" 2>/dev/null || true)"
+if [ ! -f "$APP" ] || [ "$INSTALLED" != "$TAG" ]; then
+  if [ -f "$APP" ]; then echo "編集ツールを更新しています（$INSTALLED → $TAG）..."; else echo "Downloading the editing tool ($TAG)..."; fi
   mkdir -p "$DEST"
   TMP_ZIP="$(mktemp "${TMPDIR:-/tmp}/citygml-hub.XXXXXX")"
   curl -fL "https://github.com/4dcitygml/tools/releases/download/$TAG/$ASSET" -o "$TMP_ZIP"
@@ -42,7 +44,13 @@ if [ ! -f "$APP" ]; then
     echo "ダウンロードした zip の SHA-256 が一致しません（期待 $SHA / 実際 $ACTUAL）。中断します。" >&2
     exit 1
   fi
-  unzip -oq "$TMP_ZIP" -d "$DEST"
+  # Unpack next to the old copy first; only a verified, complete archive replaces it.
+  STAGE="$(mktemp -d "${TMPDIR:-/tmp}/citygml-hub-stage.XXXXXX")"
+  unzip -oq "$TMP_ZIP" -d "$STAGE"
   rm -f "$TMP_ZIP"
+  rm -rf "$DEST/citygml-hub"
+  mv "$STAGE/citygml-hub" "$DEST/citygml-hub"
+  rmdir "$STAGE" 2>/dev/null || true
+  printf '%s\n' "$TAG" > "$MARK"
 fi
 exec python3 "$APP"

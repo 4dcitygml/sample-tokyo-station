@@ -28,9 +28,11 @@ if (-not $tag -or -not $asset -or -not $sha) {
 $dest = Join-Path $env:USERPROFILE "Documents\citygml-tools"
 $app = Join-Path $dest "citygml-hub\program\hub.py"
 $py = Join-Path $dest "citygml-hub\program\PythonPortable\python.exe"
+$mark = Join-Path $dest "citygml-hub\.release-tag"   # tag of the installed release; a different pin triggers an update
+$installed = if (Test-Path $mark) { (Get-Content $mark -Raw).Trim() } else { "" }
 
-if (-not (Test-Path $app)) {
-  Write-Host "Downloading the editing tool ($tag)..."
+if (-not (Test-Path $app) -or $installed -ne $tag) {
+  if (Test-Path $app) { Write-Host "編集ツールを更新しています（$installed → $tag）..." } else { Write-Host "Downloading the editing tool ($tag)..." }
   New-Item -ItemType Directory -Force $dest | Out-Null
   $tmp = Join-Path $env:TEMP "citygml-hub-download.zip"
   curl.exe -fLsS "https://github.com/4dcitygml/tools/releases/download/$tag/$asset" -o $tmp
@@ -44,8 +46,16 @@ if (-not (Test-Path $app)) {
     Write-Host "ダウンロードした zip の SHA-256 が一致しません（期待 $sha / 実際 $actual）。中断します。"
     exit 1
   }
-  Expand-Archive -LiteralPath $tmp -DestinationPath $dest -Force
+  # Unpack next to the old copy first; only a verified, complete archive replaces it.
+  $stage = Join-Path $env:TEMP "citygml-hub-stage"
+  if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+  Expand-Archive -LiteralPath $tmp -DestinationPath $stage -Force
   Remove-Item $tmp
+  $target = Join-Path $dest "citygml-hub"
+  if (Test-Path $target) { Remove-Item $target -Recurse -Force }
+  Move-Item (Join-Path $stage "citygml-hub") $target
+  Remove-Item $stage -Recurse -Force
+  Set-Content -Path $mark -Value $tag -NoNewline
 }
 
 if (-not (Test-Path $py)) {

@@ -4,13 +4,13 @@
     "tag / asset / sha256 are taken from the release notes of 4dcitygml/tools;",
     "update all three together when moving to a newer release."
   ],
-  "tag": "hub-v1.0.1",
+  "tag": "hub-v1.0.2",
   "windows": {
-    "asset": "citygml-hub-v1.0.1-windows-full.zip",
-    "sha256": "9844ff4f2181b6eee0516aa445acc6a0daec167c6df348933c42c27c3e5f280a"
+    "asset": "citygml-hub-v1.0.2-windows-full.zip",
+    "sha256": "c1a1c6b6fa49f58a5fcb71506572b8259522492756e3cf580f0a72d29cff98ec"
   },
   "macos": {
-    "asset": "citygml-hub-v1.0.1-macos.zip",
-    "sha256": "c0fa5b7ecaa0dadbce3da67f809a54ecd9bc387a266c78f44db0d4ee763b8fa6"
+    "asset": "citygml-hub-v1.0.2-macos.zip",
+    "sha256": "902bc508d8aa6e8b6c996e917ad246bca2a02f8292181c00bb403b9b916bfd86"
   }
 }
