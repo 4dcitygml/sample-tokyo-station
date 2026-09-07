@@ -8,7 +8,7 @@
 # cannot comment).
 #
 # Security:
-#   - PR code is neither checked out nor executed. Only the .md files (data) in the artifact are posted.
+#   - PR code is neither checked out nor executed. Artifact Markdown and structured JSON are treated only as data.
 #   - GITHUB_TOKEN sends the body via @file, so the content is never evaluated as shell/code.
 #   - The PR number carried by the artifact is accepted only after its head SHA and
 #     head repository match this workflow_run and the current GitHub API record.
@@ -24,39 +24,75 @@ on:
     workflows: ["PR Analysis (CityGML)"]
     types: [completed]
 
+  workflow_dispatch:
+    inputs:
+      analysis_run_id:
+        description: Completed PR analysis run to publish again
+        required: true
+        type: string
+
 permissions:
   contents: read
   actions: read
   pull-requests: write
+  checks: write
 
 concurrency:
-  # Serialize successive runs for the same PR branch (do not cancel older runs; let them finish posting).
-  group: pr-comment-${{ github.event.workflow_run.head_branch }}
+  # Serialize report publications for this repository (do not cancel older runs; let them finish posting).
+  group: pr-comment-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
   comment:
     # Only handle runs triggered by PRs (ignore push etc.).
-    if: ${{ github.event.workflow_run.event == 'pull_request' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Resolve the source analysis run
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ANALYSIS_RUN: ${{ github.event.workflow_run.id || inputs.analysis_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$ANALYSIS_RUN" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ANALYSIS_RUN" > /tmp/report-analysis-run.json
+          python - <<'PYCODE'
+          import json, os
+          from pathlib import Path
+          run = json.loads(Path('/tmp/report-analysis-run.json').read_text())
+          if run.get('event') != 'pull_request' or run.get('path', '').split('@')[0] != '.github/workflows/pr-analysis.yml' or run.get('status') != 'completed':
+              raise SystemExit('Not a completed PR analysis run')
+          target = Path(os.environ['RUNNER_TEMP']) / 'citygml-report-event.json'
+          target.write_text(json.dumps({'workflow_run': run}))
+          with open(os.environ['GITHUB_ENV'], 'a') as out:
+              out.write(f"REPORT_EVENT_PATH={target}\n")
+              out.write(f"RUN_HEAD_SHA={run['head_sha']}\n")
+              out.write(f"RUN_HEAD_REPO={run['head_repository']['full_name']}\n")
+          PYCODE
+
       - name: Download analysis artifact
         id: dl
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: pr-comments
           path: out
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ github.event.workflow_run.id || inputs.analysis_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
 
       - name: Post / update comments (upsert by marker)
         if: steps.dl.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-          RUN_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
         shell: bash
         run: |
           set -euo pipefail
@@ -78,7 +114,7 @@ jobs:
             exit 1
           fi
 
-          allowed='^(pr\.txt|commit-scope\.md|preview\.md|summary\.md|lint\.md|citygml_lint\.md|plateau_lint\.md|val3dity\.md|metadata\.md|commit\.md|inspection\.md|resubmission\.md|reproduction\.md)$'
+          allowed='^(inspection\.json|pr\.txt|commit-scope\.md|preview\.md|summary\.md|lint\.md|citygml_lint\.md|plateau_lint\.md|val3dity\.md|metadata\.md|commit\.md|inspection\.md|resubmission\.md|reproduction\.md)$'
           if find out -type l -print -quit | grep -q .; then
             echo "::error::Symlinks are not accepted in the analysis artifact."
             exit 1
@@ -94,7 +130,7 @@ jobs:
               echo "::error::Artifact file is too large to post safely: $file"
               exit 1
             fi
-            if [ "$size" -gt 60000 ]; then
+            if [[ "$file" == *.md ]] && [ "$size" -gt 60000 ]; then
               # Bulk PRs (source baselines, annual source updates) legitimately produce
               # long reports. GitHub rejects comment bodies over 65,536 characters, so
               # keep the leading part (marker line first), close a dangling code fence,
@@ -106,6 +142,19 @@ jobs:
               echo "truncated for posting: ${file} (${size} bytes)"
             fi
           done < <(find out -type f -print)
+
+          # Stamp publication context, without evaluating any artifact as code.
+          python - <<'PYCODE'
+          import hashlib, json, os
+          from pathlib import Path
+          d = json.loads(Path("out/inspection.json").read_text())
+          fingerprint = hashlib.sha256(json.dumps(d["context"], sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+          event = json.loads(Path(os.environ["REPORT_EVENT_PATH"]).read_text())["workflow_run"]
+          stamp = f"<!-- citygml-ci-context:{fingerprint}:{event['id']}:{event.get('run_attempt', 1)} -->"
+          for p in Path("out").glob("*.md"):
+              with p.open("a") as f:
+                  f.write("\n" + stamp + "\n")
+          PYCODE
 
           # Find an existing comment by a trusted, fixed marker; PATCH if found, POST otherwise.
           upsert() {
@@ -142,3 +191,8 @@ jobs:
           # The list of all checks and the auto-resubmission state (active/resolved) also update the same comments.
           upsert out/inspection.md '<!-- citygml-automatic-inspection -->'
           upsert out/resubmission.md '<!-- citygml-auto-resubmission -->'
+
+      - name: Publish the versioned machine report
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python .github/scripts/publish_review_report.py

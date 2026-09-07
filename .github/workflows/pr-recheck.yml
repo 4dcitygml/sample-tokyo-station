@@ -33,6 +33,7 @@ jobs:
           PR_NUMBER: ${{ github.event.issue.number }}
           REQUESTER: ${{ github.event.comment.user.login }}
           ASSOCIATION: ${{ github.event.comment.author_association }}
+          REQUEST_BODY: ${{ github.event.comment.body }}
         run: |
           set -euo pipefail
           pr="$(gh api "repos/$REPO/pulls/$PR_NUMBER")"
@@ -49,6 +50,17 @@ jobs:
             exit 1
           fi
 
+          workflow=pr-analysis.yml
+          if [[ "$REQUEST_BODY" == *'<!-- citygml-retry-workflow:pr-comment.yml -->'* ]]; then
+            workflow=pr-comment.yml
+          elif [[ "$REQUEST_BODY" == *'<!-- citygml-retry-workflow:review-report.yml -->'* ]]; then
+            workflow=review-report.yml
+          fi
+          if [[ "$workflow" == review-report.yml ]]; then
+            gh api --method POST "repos/$REPO/actions/workflows/$workflow/dispatches" -f ref=main
+            exit 0
+          fi
+
           run_id="$(gh api --method GET \
             "repos/$REPO/actions/workflows/pr-analysis.yml/runs" \
             -f event=pull_request -f head_sha="$head_sha" -f per_page=30 \
@@ -59,6 +71,10 @@ jobs:
             exit 1
           fi
 
-          gh api --method POST "repos/$REPO/actions/runs/$run_id/rerun"
+          if [[ "$workflow" == pr-comment.yml ]]; then
+            gh api --method POST "repos/$REPO/actions/workflows/pr-comment.yml/dispatches" -f ref=main -f "inputs[analysis_run_id]=$run_id"
+          else
+            gh api --method POST "repos/$REPO/actions/runs/$run_id/rerun"
+          fi
           gh api "repos/$REPO/issues/$PR_NUMBER/comments" \
             -f body="🔄 The automated inspection was started again. Please wait a few minutes for the results."

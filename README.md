@@ -8,10 +8,21 @@
 協働管理しています。**このリポジトリは必要時に初期状態へ戻す練習用サンドボックスです** —
 本番の都市データに参加する前に、編集ツールと PR の流れを安心して学べます。
 
-- **はじめかた（練習）**: [スターターキット](https://github.com/4dcitygml/sample-tokyo-station/releases/download/starter-kit/tokyo-station-starter.zip)
-  をダウンロードして展開し、`start-mac.command`（macOS）または `start-windows.bat`（Windows）を
-  ダブルクリックしてください。共有編集ツールが自動でダウンロードされ、この都市に接続します。
-  リポジトリのクローンは不要です（自分用のコピーはツールが作ります）。
+- **はじめかた（練習）**: ターミナルを開いて 1 行貼り付けるだけです。
+  macOS（ターミナル）:
+  ```
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/4dcitygml/tools/install-v1/install/citygml.sh)" -- 4dcitygml/sample-tokyo-station
+  ```
+  Windows（PowerShell）:
+  ```
+  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/4dcitygml/tools/install-v1/install/citygml.ps1))) 4dcitygml/sample-tokyo-station
+  ```
+  共有編集ツールが `4dcitygml/tools` からダウンロード・照合され、この都市に接続します。
+  リポジトリのクローンは不要です（自分用のコピーはツールが作ります）。2 回目からは
+  デスクトップのアイコンで開けます。この 1 行はインストールにも起動にも使え、もう一度
+  実行しても安全です。新しい版はツールの画面の中で案内されます。2026 年 9 月より前に
+  スターターキットで入れた方は、一度だけこの 1 行を実行し直してください（以前のものは
+  そのまま残り、消しても構いません）。
   詳しい手順と、Git を直接使う方法は [はじめかた](docs/ja/getting-started.md) を参照。
 - **データ出典・ライセンス**: `4dcitygml.json` の `attribution` / `license` を参照
   （3D都市モデル Project PLATEAU 千代田区（2023年度）／国土交通省 — CC BY 4.0）。
