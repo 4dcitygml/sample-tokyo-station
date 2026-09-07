@@ -33,7 +33,7 @@ concurrency:
 
 env:
   CITYGML_TOOLS_REPO: ${{ vars.CITYGML_TOOLS_REPO || '4dcitygml/tools' }}
-  CITYGML_TOOLS_REF: 701afe67e2ddd5da71d1e803217bc0d38f0a9db4   # keep identical to pr-analysis.yml (pin to an immutable commit SHA per release)
+  CITYGML_TOOLS_REF: 797b0fc9943bec395b3934c1659657fb2281d407   # tools-v1.2.1
 
 jobs:
   build:

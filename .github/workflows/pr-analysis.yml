@@ -3,21 +3,15 @@
 # CityGML PR analysis — thin wrapper (the "analysis" side of the two-workflow scheme).
 #
 # This workflow intentionally contains no analysis logic. It checks out the
-# shared CI logic from the 4dcitygml/tools repository (overridable, see env) at a pinned MAJOR tag and runs the
-# drivers in ci/ from that checkout. Backward-compatible fixes ship by the
-# tools side moving the v1 tag (they reach every city repository on the next
-# run, no action needed here). Breaking changes ship as v2: each city
-# repository opts in at its own time by editing CITYGML_TOOLS_REF below.
-#
-# NEVER point CITYGML_TOOLS_REF at a branch (main) or at "latest": that turns
-# updates implicit and unreviewable. Use a major tag (v1); municipalities that
-# need hard immutability can pin a commit SHA instead.
+# shared CI logic from 4dcitygml/tools at an immutable commit SHA and runs its
+# drivers in ci/. Updates require a reviewed tools release and an explicit pin
+# update in each city repository. Never use a branch or moving tag.
 #
 # Security model (unchanged from the original two-workflow scheme):
 #   - runs on untrusted code from fork PRs -> permissions are contents:read
 #     only; results are uploaded as the "pr-comments" artifact and posted by
 #     pr-comment.yml (workflow_run, trusted side).
-#   - the tools checkout is a public, tag-pinned repository; it is data +
+#   - the tools checkout is a public, SHA-pinned repository; it is data +
 #     scripts for this job only.
 
 name: PR Analysis (CityGML)
@@ -25,7 +19,7 @@ name: PR Analysis (CityGML)
 on:
   pull_request:
     # labeled/unlabeled: re-evaluate when a maintainer adds/removes labels such as texture-override.
-    types: [opened, synchronize, reopened, ready_for_review, edited, labeled, unlabeled]
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
 
 concurrency:
   group: pr-analysis-${{ github.event.pull_request.number }}
@@ -40,11 +34,11 @@ env:
   # unchanged; set the repository variable CITYGML_TOOLS_REPO only to point at your own
   # audited mirror of tools (owner/name).
   CITYGML_TOOLS_REPO: ${{ vars.CITYGML_TOOLS_REPO || '4dcitygml/tools' }}
-  CITYGML_TOOLS_REF: 701afe67e2ddd5da71d1e803217bc0d38f0a9db4   # major tag (see header). SHA-pinning is also fine.
+  CITYGML_TOOLS_REF: 797b0fc9943bec395b3934c1659657fb2281d407   # tools-v1.2.1
 
 jobs:
   analyze:
-    if: ${{ !github.event.pull_request.draft }}
+    # Inspect drafts so checks finish before the operator requests city approval.
     runs-on: ubuntu-latest
     env:
       TOOLS_DIR: ${{ github.workspace }}/.citygml-ci
@@ -66,7 +60,7 @@ jobs:
         # Do not shallow-fetch base: the "first time" for each building is determined from past commit-trailer history.
         run: git fetch --no-tags origin ${{ github.event.pull_request.base.sha }}
 
-      - name: Fetch shared CI logic (tag-pinned)
+      - name: Fetch shared CI logic (SHA-pinned)
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: ${{ env.CITYGML_TOOLS_REPO }}
@@ -85,6 +79,10 @@ jobs:
         id: main
         env:
           PREVIEW_BASE_URL: ${{ vars.PREVIEW_BASE_URL }}
+          # Exchange Contract v3.0.0 A5: a data PR must be classified. Set this repository
+          # variable to "true" only for the city's first release under v3.0.0 (guidance is
+          # posted as a warning instead of blocking); remove it afterwards.
+          CITYGML_CLASSIFICATION_WARN_ONLY: ${{ vars.CITYGML_CLASSIFICATION_WARN_ONLY }}
         run: bash "$TOOLS_DIR/ci/pr_analysis_main.sh"
 
       # --- Topological consistency gate (official engine val3dity, differential, advisory) ---
@@ -147,12 +145,10 @@ jobs:
 
       - name: Upload comment bodies (consumed by pr-comment.yml)
         if: always()
-        # Even if the GitHub Actions artifact storage quota is exhausted, do not treat the
-        # analysis itself as failed. The posting side safely skips when the artifact is missing.
-        continue-on-error: true
+        # Report delivery is part of the contract; missing artifacts fail closed.
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: pr-comments
           path: out
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 3
