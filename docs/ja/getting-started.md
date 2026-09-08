@@ -146,7 +146,7 @@ Git も GitHub アカウントも、都市データのコピーも要りませ�
 | ツール（バージョンごとに 1 フォルダ）とランチャースクリプト | `~/Documents/citygml-tools/` |
 | デスクトップ・アイコン | ドラッグした場所（ランチャースクリプトを指すだけ） |
 | 都市の作業コピー | `~/Documents/CityGML Data/` |
-| サインイン情報と設定 | `~/.citygml_auth.json`、`~/.citygml_attr_editor.json`、`~/.citygml_git_credentials` |
+| アカウントと設定 | `~/.citygml/auth/`（接続した GitHub アカウントごとに 1 ファイル）、`~/.citygml_attr_editor.json` |
 
 すべて消すには、上記を削除し、GitHub の *Settings → Applications → Authorized OAuth Apps*
 で *4dcitygml hub* を取り消します。fork と送った提案は GitHub に残ります。不要なら

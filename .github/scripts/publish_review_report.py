@@ -48,7 +48,9 @@ def build_report(repo, pr, run, inspection, artifacts, files):
         raise ValueError('Inspection context is stale')
     rows = inspection.get('checks')
     expected = {'reason','classification','commit-scope','scope-reproducibility','reproduction','freshness','file-scope','schema','minimal-diff','texture','structure','plausibility','topology','model'}
-    if not isinstance(rows, list) or len(rows) != len(expected) or {r['key'] for r in rows} != expected:
+    # Every gate this publisher knows must be present; a newer analyzer may add gates
+    # (this trusted side runs from main and is updated first, so it must accept both).
+    if not isinstance(rows, list) or not expected <= {r.get('key') for r in rows if isinstance(r, dict)}:
         raise ValueError('Incomplete inspection result')
     if any(r.get('status') not in ('pass','fail','na','pending') for r in rows):
         raise ValueError('Unknown inspection state')
@@ -62,7 +64,7 @@ def build_report(repo, pr, run, inspection, artifacts, files):
                     'topology':'TOPOLOGY_OUTCOME','model':'PREVIEW_OUTCOME','reproduction':'REPRODUCTION_OUTCOME',
                     'scope-reproducibility':'SCOPE_REPRODUCIBILITY_OUTCOME'}
     outcomes = inspection.get('outcomes')
-    if outcomes is not None and any(r['status'] == 'fail' and outcomes.get(outcome_keys[r['key']]) not in ('success','failure') for r in rows):
+    if outcomes is not None and any(r['status'] == 'fail' and outcomes.get(outcome_keys.get(r['key'], '')) not in ('success','failure') for r in rows if r['key'] in outcome_keys):
         state = 'system'
     def shorten(value):
         return value if len(value) <= 1800 else value[:1800] + text['limited']

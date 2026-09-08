@@ -163,7 +163,7 @@ them freely before working on a real city.
 | The tools (one folder per version) and the launcher script | `~/Documents/citygml-tools/` |
 | The desktop icon | wherever you dragged it (it only points at the launcher script) |
 | Your working copy of the city | `~/Documents/CityGML Data/` |
-| Sign-in token and settings | `~/.citygml_auth.json`, `~/.citygml_attr_editor.json`, `~/.citygml_git_credentials` |
+| Accounts and settings | `~/.citygml/auth/` (one file per connected GitHub account), `~/.citygml_attr_editor.json` |
 
 To remove everything, delete those items and revoke *4dcitygml hub* under
 *Settings → Applications → Authorized OAuth Apps* on GitHub. Your fork and any

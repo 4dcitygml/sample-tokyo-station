@@ -122,8 +122,13 @@ jobs:
           while IFS= read -r file; do
             name="${file#out/}"
             if [[ "$name" == */* ]] || ! [[ "$name" =~ $allowed ]]; then
-              echo "::error::Unexpected artifact file: $file"
-              exit 1
+              # A newer analysis workflow (from a PR branch) may upload files this trusted
+              # side (from main) does not know yet. They are dropped, never posted, and
+              # the run goes on with the files it knows — so a CI change lands trusted
+              # side first without a red run in between.
+              echo "::warning::Ignoring an artifact file this poster does not know: $file"
+              rm -f -- "$file"
+              continue
             fi
             size="$(wc -c < "$file")"
             if [ "$size" -gt 4194304 ]; then
