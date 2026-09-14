@@ -31,19 +31,34 @@ def checked(path, method="GET", payload=None):
     return data
 
 
+def open_heads(repo):
+    """Open PRs and how many of them share each head commit."""
+    prs = pages(api, f"/repos/{repo}/pulls?state=open")
+    return prs, Counter(pr["head"]["sha"] for pr in prs)
+
+
+def open_check(repo, sha, **fields):
+    """Start the `ci-report` check on a head commit; both trusted jobs report through it."""
+    return checked(f"/repos/{repo}/check-runs", "POST",
+                   {"name": "ci-report", "head_sha": sha, "status": "in_progress", **fields})
+
+
+def close_check(repo, check, success, title, summary, **fields):
+    checked(f"/repos/{repo}/check-runs/{check['id']}", "PATCH", {
+        "status": "completed", "conclusion": "success" if success else "failure",
+        "output": {"title": title, "summary": summary}, **fields,
+    })
+
+
 def run():
     repo = os.environ["GITHUB_REPOSITORY"]
     if not required(repo):
         return
-    prs = pages(api, f"/repos/{repo}/pulls?state=open")
-    heads = Counter(pr["head"]["sha"] for pr in prs)
+    prs, heads = open_heads(repo)
     errors = []
     for pr in prs:
         number, sha = pr["number"], pr["head"]["sha"]
-        check = checked(f"/repos/{repo}/check-runs", "POST", {
-            "name": "ci-report", "head_sha": sha, "status": "in_progress",
-            "external_id": f"pr:{number}",
-        })
+        check = open_check(repo, sha, external_id=f"pr:{number}")
         try:
             result = evaluate(api, repo, pr)
             # Checks attach to commits, not PRs. Never share a successful gate
@@ -54,23 +69,17 @@ def run():
             if context(current) != context(pr) or current["state"] != "open":
                 result = {"valid": False, "reason": "head-changed"}
             valid = result["valid"]
-            checked(f"/repos/{repo}/check-runs/{check['id']}", "PATCH", {
-                "status": "completed", "conclusion": "success" if valid else "failure",
-                "external_id": result.get("reportId", "none"),
-                "output": {
-                    "title": "Current CI report available" if valid else "Waiting for current CI report",
-                    "summary": f"PR #{number}, head {sha}. Result: {result['reason']}. "
-                               "Reviewers use the shared report and GitHub Approve. Approval counts are configured in GitHub.",
-                },
-            })
+            close_check(repo, check, valid,
+                        "Current CI report available" if valid else "Waiting for current CI report",
+                        f"PR #{number}, head {sha}. Result: {result['reason']}. "
+                        "Reviewers use the shared report and GitHub Approve. Approval counts are configured in GitHub.",
+                        external_id=result.get("reportId", "none"))
         except Exception:
-            # Leave the check in progress if the API cannot record the error:
-            # a missing result must never be promoted to success.
+            # Record the failure and go on to the next PR. If even that API call
+            # fails, the error propagates and the check stays in progress: a
+            # missing result must never be promoted to success.
             errors.append(number)
-            checked(f"/repos/{repo}/check-runs/{check['id']}", "PATCH", {
-                "status": "completed", "conclusion": "failure",
-                "output": {"title": "Report verification unavailable", "summary": "Retry the trusted workflow."},
-            })
+            close_check(repo, check, False, "Report verification unavailable", "Retry the trusted workflow.")
     if errors:
         raise RuntimeError(f"Report verification unavailable for PRs {errors}")
 

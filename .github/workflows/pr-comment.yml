@@ -44,8 +44,9 @@ concurrency:
 
 jobs:
   comment:
-    # Only handle runs triggered by PRs (ignore push etc.).
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'pull_request' }}
+    # Only runs triggered by PRs (ignore push etc.), and only those that ran to the end:
+    # a cancelled analysis (superseded by a newer run, or stopped by a person) has no result to publish.
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion != 'cancelled') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -69,7 +70,7 @@ jobs:
           import json, os
           from pathlib import Path
           run = json.loads(Path('/tmp/report-analysis-run.json').read_text())
-          if run.get('event') != 'pull_request' or run.get('path', '').split('@')[0] != '.github/workflows/pr-analysis.yml' or run.get('status') != 'completed':
+          if run.get('event') != 'pull_request' or run.get('path', '').split('@')[0] != '.github/workflows/pr-analysis.yml' or run.get('status') != 'completed' or run.get('conclusion') == 'cancelled':
               raise SystemExit('Not a completed PR analysis run')
           target = Path(os.environ['RUNNER_TEMP']) / 'citygml-report-event.json'
           target.write_text(json.dumps({'workflow_run': run}))
@@ -80,7 +81,6 @@ jobs:
           PYCODE
 
       - name: Download analysis artifact
-        id: dl
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: pr-comments
@@ -89,7 +89,6 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Post / update comments (upsert by marker)
-        if: steps.dl.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -97,7 +96,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ ! -f out/pr.txt ]; then
-            echo "No pr.txt. Nothing to post."; exit 0
+            echo "::error::The analysis artifact carries no pr.txt."; exit 1
           fi
           PR="$(cat out/pr.txt)"
           if ! [[ "$PR" =~ ^[1-9][0-9]*$ ]]; then
