@@ -1,0 +1,4 @@
+{
+  "extends": "wa",
+  "tokens": { "accent": "#165e83" }
+}

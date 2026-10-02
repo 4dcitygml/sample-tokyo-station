@@ -9,7 +9,7 @@ status: v2（v1「写真提供ポリシー」を全データ貢献に拡張）
 貢献**の権利の取り扱いを定めます。データを変更する PR を提出した時点で、提出者は本ポリシーに
 同意したものとします（各ツールは PR 本文にその旨を記録します）。
 
-English (canonical): [docs/data-contribution-policy.md](../data-contribution-policy.md)
+この日本語版は、内容を理解するための翻訳です。内容が異なる場合は、英語版（[docs/data-contribution-policy.md](../data-contribution-policy.md)）が優先します。
 
 ## 1. データへの貢献はすべて CC0 1.0
 

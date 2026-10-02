@@ -1,0 +1,48 @@
+# Copyright (c) 2026 4dcitygml
+# SPDX-License-Identifier: Apache-2.0
+# The required check is posted to each PR head, not the default-branch SHA.
+# Re-read live PR context and the published machine evidence. Human approvals
+# are governed by GitHub rulesets, not a separate operator confirmation check.
+name: Verify CI review report
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited, labeled, unlabeled]
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pull-requests: read
+  checks: write
+  actions: read
+concurrency:
+  # One queue per PR (a PR event); push and manual runs, which evaluate every open PR, share
+  # one queue. A single repository-wide queue would let a third event cancel another PR's
+  # pending evaluation. After a report, the poster verifies its PR itself.
+  group: ci-review-report-${{ github.event.pull_request.number || 'all-open-prs' }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    # CI switch: the repository variable CITYGML_CI set to `off` skips automatic runs
+    # (city-template docs/operator-handbook.md 6.8); a manual dispatch still runs.
+    # The `city-review` label is not part of the report context: adding or removing it
+    # leaves the report as valid as it was, so it starts no evaluation.
+    if: >-
+      (vars.CITYGML_CI != 'off' || github.event_name == 'workflow_dispatch') &&
+      !((github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
+        github.event.label.name == 'city-review')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Never check out the event's PR head or use scripts from its artifact.
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Verify current machine report and publish head-bound checks
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python .github/scripts/check_review_report.py

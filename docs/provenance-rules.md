@@ -6,8 +6,6 @@
 Rules for where — and at what granularity — the sources and evidence of
 attribute values, geometry, and textures are recorded.
 
-日本語版: [docs/ja/provenance-rules.md](ja/provenance-rules.md)
-
 > **Scope note.** These rules were designed for CityGML datasets that use the
 > i-UR ADE (`uro:` — the extension adopted by Japan's PLATEAU program), which
 > is where the layer-1 mechanisms below come from. City repositories based on
@@ -177,7 +175,7 @@ resolves uniquely:
 
 ## 3. Layer 3 — git history (always, automatic)
 
-- Commits carry a `Building: <uro:buildingID>` trailer (see
+- Commits carry a `Building: <building ID>` trailer (see
   `scripts/suggest_commit.py`). The minimal-diff gate guarantees leaf-level
   diffs, so **`git blame` works at attribute granularity**.
 - When an attribute is produced by derivation or conversion, record the

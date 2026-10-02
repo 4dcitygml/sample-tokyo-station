@@ -27,14 +27,17 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read   # the inspection reads the PR as GitHub holds it, not only the event
 
 env:
   # Shared CI logic lives in the 4dcitygml/tools repository. City repositories hosted
   # outside the 4dcitygml organization (a municipality's own org, a fork) keep using it
   # unchanged; set the repository variable CITYGML_TOOLS_REPO only to point at your own
-  # audited mirror of tools (owner/name).
+  # audited mirror of tools (owner/name). When that mirror is private, also store a
+  # fine-grained token with read-only Contents access to it as the repository secret
+  # CITYGML_TOOLS_TOKEN; without the secret the job's own token is used.
   CITYGML_TOOLS_REPO: ${{ vars.CITYGML_TOOLS_REPO || '4dcitygml/tools' }}
-  CITYGML_TOOLS_REF: 797b0fc9943bec395b3934c1659657fb2281d407   # tools-v1.2.1
+  CITYGML_TOOLS_REF: a48d4658ec177c3ccfab6ffc24490fdb9dd3220f   # tools-v1.5.0
 
 jobs:
   analyze:
@@ -43,6 +46,13 @@ jobs:
     env:
       TOOLS_DIR: ${{ github.workspace }}/.citygml-ci
     steps:
+      # CI switch (city-template docs/operator-handbook.md 6.8): `analyze` is a required check, and a skipped
+      # job counts as passed, so with CITYGML_CI set to `off` the job fails here instead.
+      - name: CI switch
+        if: vars.CITYGML_CI == 'off'
+        run: |
+          echo "::error::CITYGML_CI is off in this repository; the analysis did not run."
+          exit 1
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # Pin the exact head commit from the event, not the branch name: checking
@@ -66,6 +76,7 @@ jobs:
           repository: ${{ env.CITYGML_TOOLS_REPO }}
           ref: ${{ env.CITYGML_TOOLS_REF }}
           path: .citygml-ci
+          token: ${{ secrets.CITYGML_TOOLS_TOKEN || github.token }}
           persist-credentials: false
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
@@ -83,6 +94,8 @@ jobs:
           # variable to "true" only for the city's first release under v3.0.0 (guidance is
           # posted as a warning instead of blocking); remove it afterwards.
           CITYGML_CLASSIFICATION_WARN_ONLY: ${{ vars.CITYGML_CLASSIFICATION_WARN_ONLY }}
+          # Lets the pin check list the tools-v tags of a private mirror (see CITYGML_TOOLS_REPO).
+          CITYGML_TOOLS_TOKEN: ${{ secrets.CITYGML_TOOLS_TOKEN }}
         run: bash "$TOOLS_DIR/ci/pr_analysis_main.sh"
 
       # --- Topological consistency gate (official engine val3dity, differential, advisory) ---
@@ -138,9 +151,12 @@ jobs:
       - name: Build automatic inspection summary and resubmission request
         if: always()
         env:
-          # STRICT_GATE=1 (practice repos, via repo variable): "❌ Needs attention"
-          # turns this job red so branch protection can use it as a merge gate.
+          # STRICT_GATE=1 (repository variable CITYGML_STRICT_GATE, set by every city,
+          # README step 11): a blocking finding or a system error turns this job red,
+          # so the ruleset's required `analyze` check is the merge gate.
           STRICT_GATE: ${{ vars.CITYGML_STRICT_GATE }}
+          # Reads the PR as GitHub holds it now (pull-requests: read), for the report's context.
+          GITHUB_TOKEN: ${{ github.token }}
         run: bash "$TOOLS_DIR/ci/inspection_summary.sh"
 
       - name: Upload comment bodies (consumed by pr-comment.yml)

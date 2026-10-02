@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "about": "A practice city carries every file of the template, byte for byte, except the ones listed under replaced; it may add the files listed under added, the getting-started in its own language (added_in_city_language), its data, and the activated practice files. Read by the tools test that compares the city copies.",
+  "replaced": {
+    "README.md": "the city's own README",
+    "LICENSE": "the template's terms extended by the practice data's terms",
+    "NOTICE": "the practice data's provenance record",
+    ".github/PULL_REQUEST_TEMPLATE.md": "the template's file for the city's lang: .github/PULL_REQUEST_TEMPLATE/<lang>.md when it exists, else the template's own file"
+  },
+  "added": [
+    "4dcitygml.json",
+    "theme.json",
+    "logo.png"
+  ],
+  "added_in_city_language": [
+    "docs/<lang>/getting-started.md"
+  ],
+  "added_data": "every data_dirs entry of 4dcitygml.json, and provenance/",
+  "activated": {
+    ".github/workflows/manual-reset.yml": ".github/practice/manual-reset.yml"
+  }
+}

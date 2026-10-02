@@ -26,7 +26,7 @@ whole installation; it is the same on every computer and never gets stale.
   repository's README (*Get started*), press Return:
 
   ```
-  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/4dcitygml/tools/install-v1/install/citygml.sh)" -- 4dcitygml/sample-tokyo-station
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/4dcitygml/tools/install-v1/install/citygml.sh)" -- <owner>/<repo>
   ```
   If macOS offers to install the *command line developer tools*, accept and run the
   line again afterwards. If it asks whether the terminal may access your Documents
@@ -136,9 +136,10 @@ downloaded or restarted without your click.
 ## 8. Practice repositories
 
 The sample cities are practice environments. Proposals, comments, and review there
-are real GitHub history, but the data is periodically reset to its baseline, so a
-merged practice change does not have to be "right"; it has to follow the rules. Use
-them freely before working on a real city.
+are real GitHub history. From time to time a maintainer returns the data to its
+baseline with a reset pull request; the history stays. A merged practice change does
+not have to be "right"; it has to follow the rules. Use them freely before working
+on a real city.
 
 ## 9. Troubleshooting
 

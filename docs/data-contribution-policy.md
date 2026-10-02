@@ -10,7 +10,8 @@ repository (CityGML and texture images under the data directories)**. By
 submitting a PR that changes data, the submitter agrees to this policy (the
 editing tools record this agreement in the PR body).
 
-日本語版: [docs/ja/data-contribution-policy.md](ja/data-contribution-policy.md)
+Translations for understanding: [Japanese](ja/data-contribution-policy.md),
+[German](de/data-contribution-policy.md). The English text governs.
 
 ## 1. All data contributions are CC0 1.0
 

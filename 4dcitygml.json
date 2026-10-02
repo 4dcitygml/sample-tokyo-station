@@ -12,5 +12,6 @@
   "data_dirs": ["13101_chiyoda-ku_pref_2023_citygml_1_op"],
   "map": { "tiles": "gsi", "center": [35.6812, 139.7671], "zoom": 16 },
   "attribution": "3D都市モデル（Project PLATEAU）千代田区（2023年度）／国土交通省 — CC BY 4.0",
-  "license": "CC-BY-4.0"
+  "license": "CC-BY-4.0",
+  "min_hub": "hub-v1.5.0"
 }
