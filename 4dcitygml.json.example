@@ -1,0 +1,18 @@
+{
+  "id": "<code>-<cityname>",
+  "name": { "en": "<City Name>", "ja": "<都市名>", "de": "<Stadtname>" },
+  "repo": "<owner>/<code>-<cityname>",
+  "country": "<ISO 3166-1 alpha-2>",
+  "lang": "<BCP 47, e.g. en / ja / de — the repo's working language>",
+  "edition": "<i-UR edition of the data, e.g. iur-3.2; omit when the data has no i-UR>",
+  "crs": "<EPSG:xxxx>",
+  "units": "m",
+  "building_id": { "type": "uro:buildingID", "invalid_values": [] },
+  "data_dirs": ["<dataset folder>"],
+  "map": { "tiles": "osm", "center": [0.0, 0.0], "zoom": 15 },
+  "logo": "logo.png",
+  "attribution": "<data source attribution required by the license>",
+  "license": "<license id>",
+  "min_hub": "<oldest editing-tools release this city accepts: hub-v1.5.0 or later>",
+  "oauthClientId": ""
+}

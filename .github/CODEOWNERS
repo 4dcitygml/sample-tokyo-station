@@ -3,8 +3,6 @@
 # by forged CI results or artifacts.
 #
 # The personal maintainer account is the code owner; the organization itself
-# cannot be used as a code owner. The former owner-less exception for the
-# practice data files (auto-merge of data-only PRs) was removed on 2026-08-24;
-# reinstate it only together with a decision to resume automatic merging.
+# cannot be used as a code owner.
 
 *   @citydatawalker

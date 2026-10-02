@@ -1,0 +1,193 @@
+# Copyright (c) 2026 4dcitygml
+# SPDX-License-Identifier: Apache-2.0
+#
+# Manual practice reset — by pull request, never by force-push.
+#
+# An operator dispatches this workflow (typing RESET). It creates a branch
+# reset/<date> from main holding ONE commit that returns the city's data directories
+# (data_dirs in 4dcitygml.json, plus provenance/ where present) to exactly what the
+# `baseline` branch holds, and changes nothing outside them (workflows, documents and
+# configuration stay as they are on main). History is kept, nothing is rewritten. It
+# opens a pull request to main; a person reviews and merges it. Only then are the open
+# proposals that change nothing but the data directories closed, with a note in the
+# city's language (`lang` in 4dcitygml.json); other pull requests stay open. The tools'
+# commit-scope gate verifies the data blob ids against the Reset-To commit
+# (Change-Type: practice-reset), so the reset can neither smuggle nor miss a change.
+#
+# Practice cities only: this file lives in the template's .github/practice/ folder and
+# is copied into .github/workflows/ by a practice city (.github/practice/README.md).
+#
+# Requirements:
+#   - a `baseline` branch holding the pristine practice data (re-cut only when the
+#     data itself changes; it need not track workflows or documents)
+#   - repository variable PRACTICE_REPO = this repository's owner/name
+#   - repository setting "Allow GitHub Actions to create and approve pull requests"
+#     (otherwise GITHUB_TOKEN may not open the pull request)
+#   - GITHUB_TOKEN only; no personal token, no RESET_TOKEN secret.
+#
+# A pull request opened by GITHUB_TOKEN starts no pull_request workflow. The
+# operator adds the `practice-reset` label (or edits the description) to run the
+# checks, then merges.
+
+name: Manual practice reset
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type RESET to open a pull request that returns main to baseline'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: manual-reset
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    # Fail-closed guard: runs only where the PRACTICE_REPO repository variable is set
+    # to this repo's own owner/name (forks and copies do not have it -> inert).
+    if: >-
+      github.repository == vars.PRACTICE_REPO &&
+      inputs.confirmation == 'RESET'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Create the reset branch (one commit, data directories = baseline)
+        id: branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin baseline main
+          BASELINE="$(git rev-parse origin/baseline)"
+          MAIN="$(git rev-parse origin/main)"
+          # The city's data: data_dirs from 4dcitygml.json on main, plus provenance/
+          # (the repository scope gate counts both as data).
+          DIRS=()
+          while IFS= read -r d; do [ -n "$d" ] && DIRS+=("$d"); done < <(python3 -c '
+          import json
+          cfg = json.load(open("4dcitygml.json", encoding="utf-8"))
+          dirs = [str(d).strip("/") for d in (cfg.get("data_dirs") or []) if isinstance(d, str) and d.strip("/")]
+          print("\n".join(dict.fromkeys(dirs + ["provenance"])))')
+          if [ "${#DIRS[@]}" -eq 0 ]; then
+            echo "::error::4dcitygml.json declares no data_dirs; nothing to reset."
+            exit 1
+          fi
+          echo "data directories: ${DIRS[*]}"
+          data_listing() { git ls-tree -r "$1" -- "${DIRS[@]}" 2>/dev/null || true; }
+          if [ "$(data_listing "$MAIN")" = "$(data_listing "$BASELINE")" ]; then
+            echo "main already holds the baseline data; nothing to reset."
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          BRANCH="reset/$(date -u +%F)"
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            BRANCH="${BRANCH}-$(date -u +%H%M%S)"
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q -b "$BRANCH" "$MAIN"
+          # Replace only the data directories with baseline's content; everything else stays main's.
+          for d in "${DIRS[@]}"; do
+            git rm -r --quiet --ignore-unmatch -- "$d"
+            if git cat-file -e "${BASELINE}:${d}" 2>/dev/null; then
+              git checkout "$BASELINE" -- "$d"
+            fi
+          done
+          printf 'Reset practice data to baseline\n\nChange-Type: practice-reset\nReset-To: %s\n' "$BASELINE" > "$RUNNER_TEMP/reset-message.txt"
+          git commit -q -F "$RUNNER_TEMP/reset-message.txt"
+          # Self-check, the same two conditions the tools' commit-scope gate verifies.
+          if [ "$(data_listing HEAD)" != "$(data_listing "$BASELINE")" ]; then
+            echo "::error::The reset commit does not hold the baseline data exactly."
+            exit 1
+          fi
+          inside() { local d; for d in "${DIRS[@]}"; do [[ "$1" == "$d/"* ]] && return 0; done; return 1; }
+          outside="$(git diff --name-only --no-renames "$MAIN" HEAD | while IFS= read -r f; do inside "$f" || echo "$f"; done)"
+          if [ -n "$outside" ]; then
+            echo "::error::The reset commit changes paths outside the data directories: ${outside}"
+            exit 1
+          fi
+          git push origin "HEAD:refs/heads/${BRANCH}"
+          {
+            echo "created=true"
+            echo "branch=${BRANCH}"
+            echo "baseline=${BASELINE}"
+            echo "main=${MAIN}"
+            echo "dirs=${DIRS[*]}"
+          } >> "$GITHUB_OUTPUT"
+          echo "reset branch ${BRANCH}: data directories of main ${MAIN} -> those of baseline ${BASELINE}"
+
+      - name: Open the reset pull request
+        if: steps.branch.outputs.created == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
+          BASELINE: ${{ steps.branch.outputs.baseline }}
+          MAIN: ${{ steps.branch.outputs.main }}
+        run: |
+          set -euo pipefail
+          # Idempotent: --force updates the label if it already exists.
+          gh label create practice-reset --force --color 6f42c1 \
+            --description "Reset of the practice data to baseline (adding it runs the checks)" >/dev/null
+          {
+            echo '<!-- citygml-practice-reset -->'
+            # The analysis requires the reason section of the PR template (<!--sec:reason-->).
+            echo '## Summary of changes <!--sec:reason-->'
+            echo
+            echo "This pull request returns the city's data directories to their baseline, commit \`${BASELINE}\` (branch \`baseline\`), and changes nothing outside them. History is kept: the previous state of main (\`${MAIN}\`) stays in the log, nothing is rewritten and main is never force-pushed."
+            echo
+            echo "The commit carries \`Change-Type: practice-reset\` and \`Reset-To: ${BASELINE}\`; the analysis verifies that the data directories are exactly those of the baseline commit and that nothing else changed."
+            echo
+            echo "A pull request opened by the workflow token starts no checks by itself. **Add the label \`practice-reset\` (or edit this description) to run the checks, then merge.** Its first analysis run waits for approval: leave it as it is, the labelled run is the one that counts (approving it would cancel the labelled run)."
+          } > "$RUNNER_TEMP/reset-body.md"
+          url="$(gh pr create --repo "$REPO" --base main --head "$BRANCH" \
+            --title "Reset practice data to baseline ($(date -u +%F))" \
+            --body-file "$RUNNER_TEMP/reset-body.md")"
+          echo "opened ${url}"
+          echo "## Practice reset pull request" >> "$GITHUB_STEP_SUMMARY"
+          echo "${url} — add the label \`practice-reset\` to run the checks, then merge." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Close open data proposals with a note
+        if: steps.branch.outputs.created == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DIRS: ${{ steps.branch.outputs.dirs }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
+        run: |
+          set -euo pipefail
+          # Only proposals that change nothing but the data directories are closed: the
+          # reset replaces exactly those files. A maintainer's CI or document PR stays open,
+          # and so does the reset pull request itself. The note is in the city's language.
+          city_lang="$(python3 -c 'import json; print(json.load(open("4dcitygml.json", encoding="utf-8")).get("lang") or "")')"
+          case "$city_lang" in
+            ja) note='🧹 **練習データのリセット**：この練習リポジトリは初期状態へ戻されるため、この提案はクローズされます。作業に問題があったわけではありません。次に練習する前に **fork の同期**（Sync fork ボタンで fork 側の古いコミットを破棄）をお願いします。同期しないと、リセットで戻された編集が次の提案に混入します（公式編集ツールを使う場合は起動時に自動同期されるため、この操作は不要です）。' ;;
+            de) note='🧹 **Übungs-Reset**: Dieses Übungs-Repository wird in seinen Ausgangszustand zurückgesetzt, daher wird dieser offene Vorschlag geschlossen. An Ihrer Arbeit ist nichts falsch: Sie können jederzeit wieder üben. Bitte **synchronisieren Sie vorher Ihren Fork** (Schaltfläche „Sync fork“, die alten Commits Ihres Forks verwerfen), damit die zurückgesetzten Änderungen nicht in Ihren nächsten Vorschlag gelangen. Das offizielle Bearbeitungswerkzeug erledigt das beim Start automatisch.' ;;
+            *) note='🧹 **Practice reset**: this practice repository is being returned to its pristine state, so this open proposal is being closed. Nothing is wrong with your work: feel free to practice again anytime. Before you do, please **sync your fork** (the "Sync fork" button, discarding your fork'"'"'s old commits) so that the reset edits do not leak into your next proposal. The official editing tool does this automatically at startup.' ;;
+          esac
+          read -r -a dirs <<< "$DIRS"
+          inside() { local d; for d in "${dirs[@]}"; do [[ "$1" == "$d/"* ]] && return 0; done; return 1; }
+          while IFS=$'\t' read -r pr head; do
+            [ -n "$pr" ] || continue
+            [ "$head" != "$BRANCH" ] || continue
+            outside="$(gh api "repos/${REPO}/pulls/${pr}/files" --paginate \
+              --jq '.[] | .filename, (.previous_filename // empty)' | while IFS= read -r f; do inside "$f" || echo "$f"; done)"
+            if [ -n "$outside" ]; then
+              echo "kept PR #${pr}: it changes files outside the data directories"
+              continue
+            fi
+            gh api "repos/${REPO}/issues/${pr}/comments" -f body="$note" >/dev/null
+            gh api --method PATCH "repos/${REPO}/pulls/${pr}" -f state=closed >/dev/null
+            echo "closed PR #${pr}"
+          done < <(gh api "repos/${REPO}/pulls?state=open&per_page=100" --paginate --jq '.[] | [.number, .head.ref] | @tsv')

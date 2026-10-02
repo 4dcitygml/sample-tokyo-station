@@ -1,7 +1,8 @@
 # Copyright (c) 2026 4dcitygml
 # SPDX-License-Identifier: Apache-2.0
 # Re-run the existing read-only PR analysis when the submitter or a maintainer requests a re-inspection from the hub.
-# PR code is neither checked out nor executed in this trusted workflow.
+# PR code is neither checked out nor executed in this trusted workflow; .github/scripts/recheck_analysis.py
+# is read from the default branch.
 name: PR Analysis recheck request
 
 on:
@@ -11,8 +12,9 @@ on:
 permissions:
   actions: write
   contents: read
-  issues: write
-  pull-requests: read
+  # The replies go to pull requests (the job runs only for issue comments on a PR);
+  # commenting on a PR through the issues API needs pull-requests: write, not issues: write.
+  pull-requests: write
 
 concurrency:
   group: pr-recheck-${{ github.event.issue.number }}
@@ -20,61 +22,22 @@ concurrency:
 
 jobs:
   recheck:
+    # CITYGML_CI set to `off` skips automatic runs (city-template docs/operator-handbook.md 6.8).
     if: >-
+      vars.CITYGML_CI != 'off' &&
       github.event.issue.pull_request &&
       contains(github.event.comment.body, '<!-- citygml-ci-retry-request -->')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
       - name: Authorize request and rerun current PR analysis
-        shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.issue.number }}
-          REQUESTER: ${{ github.event.comment.user.login }}
-          ASSOCIATION: ${{ github.event.comment.author_association }}
-          REQUEST_BODY: ${{ github.event.comment.body }}
-        run: |
-          set -euo pipefail
-          pr="$(gh api "repos/$REPO/pulls/$PR_NUMBER")"
-          author="$(jq -r '.user.login' <<<"$pr")"
-          state="$(jq -r '.state' <<<"$pr")"
-          head_sha="$(jq -r '.head.sha' <<<"$pr")"
-          if [[ "$state" != "open" ]]; then
-            echo "PR is closed; skipping re-inspection"
-            exit 1
-          fi
-          if [[ "$REQUESTER" != "$author" && ! "$ASSOCIATION" =~ ^(OWNER|MEMBER|COLLABORATOR)$ ]]; then
-            gh api "repos/$REPO/issues/$PR_NUMBER/comments" \
-              -f body="Only the proposer or a maintainer can request a re-inspection."
-            exit 1
-          fi
-
-          workflow=pr-analysis.yml
-          if [[ "$REQUEST_BODY" == *'<!-- citygml-retry-workflow:pr-comment.yml -->'* ]]; then
-            workflow=pr-comment.yml
-          elif [[ "$REQUEST_BODY" == *'<!-- citygml-retry-workflow:review-report.yml -->'* ]]; then
-            workflow=review-report.yml
-          fi
-          if [[ "$workflow" == review-report.yml ]]; then
-            gh api --method POST "repos/$REPO/actions/workflows/$workflow/dispatches" -f ref=main
-            exit 0
-          fi
-
-          run_id="$(gh api --method GET \
-            "repos/$REPO/actions/workflows/pr-analysis.yml/runs" \
-            -f event=pull_request -f head_sha="$head_sha" -f per_page=30 \
-            --jq '[.workflow_runs[] | select(.status == "completed")] | sort_by(.created_at) | last | .id // empty')"
-          if [[ -z "$run_id" ]]; then
-            gh api "repos/$REPO/issues/$PR_NUMBER/comments" \
-              -f body="No re-runnable automated inspection record was found. Please contact a maintainer."
-            exit 1
-          fi
-
-          if [[ "$workflow" == pr-comment.yml ]]; then
-            gh api --method POST "repos/$REPO/actions/workflows/pr-comment.yml/dispatches" -f ref=main -f "inputs[analysis_run_id]=$run_id"
-          else
-            gh api --method POST "repos/$REPO/actions/runs/$run_id/rerun"
-          fi
-          gh api "repos/$REPO/issues/$PR_NUMBER/comments" \
-            -f body="🔄 The automated inspection was started again. Please wait a few minutes for the results."
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python .github/scripts/recheck_analysis.py

@@ -1,7 +1,7 @@
 # Copyright (c) 2026 4dcitygml
 #
 # Building history index — publishes a static per-building timeline
-# (index.html + buildings/<uro:buildingID>.json) to GitHub Pages, derived from
+# (index.html + buildings/<building ID>.json) to GitHub Pages, derived from
 # the git history by tools/scripts/building_history.py: community proposals
 # (one commit per building), identity changes, whole-file official baselines
 # and manifest-backed bulk updates all appear on one timeline per building.
@@ -32,11 +32,16 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  # Same rule as pr-analysis.yml: CITYGML_TOOLS_REPO names your own audited mirror,
+  # CITYGML_TOOLS_TOKEN (secret, read-only Contents) is needed only when it is private.
   CITYGML_TOOLS_REPO: ${{ vars.CITYGML_TOOLS_REPO || '4dcitygml/tools' }}
-  CITYGML_TOOLS_REF: 797b0fc9943bec395b3934c1659657fb2281d407   # tools-v1.2.1
+  CITYGML_TOOLS_REF: a48d4658ec177c3ccfab6ffc24490fdb9dd3220f   # tools-v1.5.0
 
 jobs:
   build:
+    # CI switch: the repository variable CITYGML_CI set to `off` skips automatic runs
+    # (city-template docs/operator-handbook.md 6.8); a manual dispatch still runs.
+    if: vars.CITYGML_CI != 'off' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
       configured: ${{ steps.city.outputs.configured }}
@@ -57,6 +62,7 @@ jobs:
           repository: ${{ env.CITYGML_TOOLS_REPO }}
           ref: ${{ env.CITYGML_TOOLS_REF }}
           path: .citygml-ci
+          token: ${{ secrets.CITYGML_TOOLS_TOKEN || github.token }}
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         if: steps.city.outputs.configured == 'true'
