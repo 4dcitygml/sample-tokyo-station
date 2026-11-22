@@ -255786,6 +255786,11 @@
 	<core:cityObjectMember>
 		<bldg:Building gml:id="bldg_df8321c4-9ace-487f-9610-841f61b3d2b0">
 			<core:creationDate>2024-03-15</core:creationDate>
+			<gen:genericAttributeSet name="出典">
+				<gen:stringAttribute name="bldg:storeysBelowGround">
+					<gen:value>7</gen:value>
+				</gen:stringAttribute>
+			</gen:genericAttributeSet>
 			<gen:stringAttribute name="延べ面積換算係数">
 				<gen:value>1.00</gen:value>
 			</gen:stringAttribute>
@@ -255805,7 +255810,7 @@
 			<bldg:usage codeSpace="../../codelists/Building_usage.xml">401</bldg:usage>
 			<bldg:measuredHeight uom="m">166.8</bldg:measuredHeight>
 			<bldg:storeysAboveGround>28</bldg:storeysAboveGround>
-			<bldg:storeysBelowGround>0</bldg:storeysBelowGround>
+			<bldg:storeysBelowGround>1</bldg:storeysBelowGround>
 			<bldg:lod0RoofEdge>
 				<gml:MultiSurface srsName="http://www.opengis.net/def/crs/EPSG/0/6697" srsDimension="3">
 					<gml:surfaceMember>
@@ -273320,6 +273325,7 @@
 					<uro:srcScale codeSpace="../../codelists/BuildingDataQualityAttribute_srcScale.xml">1</uro:srcScale>
 					<uro:geometrySrcDesc codeSpace="../../codelists/BuildingDataQualityAttribute_geometrySrcDesc.xml">5</uro:geometrySrcDesc>
 					<uro:thematicSrcDesc codeSpace="../../codelists/BuildingDataQualityAttribute_thematicSrcDesc.xml">1</uro:thematicSrcDesc>
+					<uro:thematicSrcDesc codeSpace="../../codelists/BuildingDataQualityAttribute_thematicSrcDesc.xml">7</uro:thematicSrcDesc>
 					<uro:appearanceSrcDesc codeSpace="../../codelists/BuildingDataQualityAttribute_appearanceSrcDesc.xml">1</uro:appearanceSrcDesc>
 					<uro:lod1HeightType codeSpace="../../codelists/BuildingDataQualityAttribute_lod1HeightType.xml">2</uro:lod1HeightType>
 					<uro:lodType>2.2</uro:lodType>
