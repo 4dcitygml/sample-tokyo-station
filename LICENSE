@@ -1,16 +1,20 @@
 Licensing for sample-tokyo-station
 ==================================
 
-This repository contains two classes of content with different terms:
+This repository contains three classes of content with different terms:
 
 1. Project code, configuration, CI workflows, and documentation — everything
-   OUTSIDE 13101_chiyoda-ku_pref_2023_citygml_1_op/ — are licensed under the Apache License 2.0
+   OUTSIDE 13101_chiyoda-ku_pref_2023_citygml_1_op/ and docs/practice-photos/ — are licensed under the Apache License 2.0
    (Section A below).
 
 2. The city dataset in 13101_chiyoda-ku_pref_2023_citygml_1_op/ (CityGML, code lists, metadata, specification documents, texture images) keeps the license of its
    original source (Section B below). See NOTICE for the full provenance
    record: source, acquisition date, attribution, and the list of
    modifications made to the original data.
+
+3. The practice photos in docs/practice-photos/ are CC0 1.0 or in the public
+   domain, as listed per photo (source, author, changes) in
+   docs/practice-photos/CREDITS.md.
 
 Contributions via pull request are accepted under the terms of the component
 they modify: code and documentation under Apache-2.0, data and texture images

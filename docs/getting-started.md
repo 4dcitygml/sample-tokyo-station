@@ -43,9 +43,9 @@ What happens, in order:
    copy of the launcher script stays in `~/Documents/citygml-tools/`.
 3. The hub opens in your browser, already connected to this city. Keep the terminal
    window open while you work; closing it stops the tools.
-4. After the setup below, the hub offers to create a **desktop icon** for this city.
-   From then on you open the tools with that icon; the terminal line is only for the
-   first time (or for another computer).
+4. After the setup below, the hub offers a **desktop icon** for this city; placing it
+   is up to you. How to open the tools next time, with or without the icon:
+   [Next time](#7-next-time).
 
 This repository contains data, documents and settings only. Every program that runs
 on your computer comes from `4dcitygml/tools` releases — the same for every city.
@@ -123,11 +123,19 @@ name in the history is your GitHub account, the same as in any pull request.
 
 ## 7. Next time
 
-Double-click the desktop icon the hub created (or run the same one-line command
-again — it is safe to repeat). Setup is skipped, and the hub opens directly. The hub
+Double-click the desktop icon, if you placed one. Without an icon, open the terminal
+as in [Quick start](#1-quick-start-one-command) and run the same one-line command again
+(it is safe to repeat), or the launcher script that stays on your computer:
+
+- macOS (Terminal): `~/Documents/citygml-tools/citygml.sh <owner>/<repo>`
+- Windows (PowerShell): `powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\Documents\citygml-tools\citygml.ps1" <owner>/<repo>`
+
+The hub's terminal window and its last setup screen show this command for the city.
+Setup is skipped, and the hub opens directly. The hub
 brings your copy of the city data up to date in the background and shows the state
 on its screen; if a proposal is still reported as behind the city (*base stale*), send
-it again from the same building after the sync has completed.
+it again from the same building after the sync has completed. On GitHub, the
+**Update branch** button on the pull request brings it up to date as well.
 
 When a newer version of the tools is published, the hub shows a banner. *Get it now*
 downloads and verifies it; the new version is used from the next start. Nothing is
@@ -188,9 +196,8 @@ Everything the hub does is ordinary Git and GitHub, so you may skip the hub enti
   which states exactly what CI enforces and offers a local checker that runs the same
   code as CI.
 - **Build your own tool.** Any program that produces proposals satisfying the contract is
-  welcome, from a script to a full editor or a QGIS plugin. Add a `Created-By:` trailer
-  so maintainers can tell clients apart, use the practice repositories as your sandbox,
-  and tell us about it in an issue on `4dcitygml/tools`.
+  welcome, from a script to a full editor or a QGIS plugin. Use the practice repositories
+  as your sandbox, and tell us about it in an issue on `4dcitygml/tools`.
 - **Where the hub's copy lives.** If you also use the hub, its working copy is the clone
   under `~/Documents/CityGML Data/`; the hub reads the connected city from the clone's
   `origin` remote, so pointing that clone at another fork or branch works as expected.

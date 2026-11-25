@@ -29,6 +29,7 @@ Diese deutsche Fassung ist eine Übersetzung zum Verständnis. Bei Abweichungen 
    - Fahrzeug-Kennzeichen
    - Namensschilder, Rauminterieurs, Wäsche und ähnliche Spuren des täglichen Lebens
 4. **Fremdliche Werke im Frame**: Lokales Urheberrecht ermöglicht normalerweise die Fotografieren von Gebäude-Außenseiten und erlaubt *beiläufige* Einbeziehung von Zeichen, Plakaten und Displays (in Japan: Artikel 46 und 30-2 des Urheberrechts-Gesetzes). Vermeiden Sie Fotos, bei denen solche Werke das Hauptthema sind.
+5. **Nur in Übungs-Repositories**: In einem Übungs-Repository (einer `sample-*-station`-Stadt) dürfen die Fotos aus dessen Ordner `docs/practice-photos/` anstelle eigener Fotos für Textur-Pull-Requests verwendet werden (eine Ausnahme zu Punkt 1). Sie sind CC0 oder gemeinfrei; Quelle, Urheber und Bearbeitung stehen in `docs/practice-photos/CREDITS.md`, und wo Personen oder Fahrzeuge erkennbar waren, wurde der Straßenbereich abgeschnitten (Punkt 3).
 
 Der Textur-Editor fordert eine ausdrückliche Zustimmungs-Überprüfung beim Erstellen eines Pull Requests an (Fotos sind wesentliche urheberrechtlich geschützte Werke, daher ist Zustimmung ausdrücklich). Der Attribut-Editor zeichnet die Zustimmung im Pull-Request-Body ohne ein Kontrollkästchen auf — **Reibung ist proportional zum Rechts-Risiko** nach Design.
 

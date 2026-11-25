@@ -15,7 +15,7 @@ from pathlib import Path
 import check_review_report
 import github_api as gh
 import publish_review_report
-from operator_explanation import context, digest
+from operator_explanation import currency
 
 OUT = Path("out")
 ANALYSIS_WORKFLOW = ".github/workflows/pr-analysis.yml"
@@ -30,7 +30,6 @@ MARKERS = {
     "lint.md": "<!-- citygml-reviewability-lint -->",
     "citygml_lint.md": "<!-- citygml-quality-lint -->",
     "plausibility_lint.md": "<!-- plausibility-lint -->",
-    "plateau_lint.md": "<!-- plateau-quality-lint -->",   # analyses before tools-v1.5.0
     "val3dity.md": "<!-- val3dity-topology-gate -->",
     "metadata.md": "<!-- citygml-metadata -->",
     "reproduction.md": "<!-- citygml-bulk-reproduction -->",
@@ -39,8 +38,6 @@ MARKERS = {
     "inspection.md": "<!-- citygml-automatic-inspection -->",
     "resubmission.md": "<!-- citygml-auto-resubmission -->",
 }
-# A renamed comment takes over the comment its former marker started (Exchange Contract v3.4.0).
-FORMER = {"plausibility_lint.md": "<!-- plateau-quality-lint -->"}
 DATA_FILES = ("inspection.json", "pr.txt")      # read by this side and by the report publisher
 ARTIFACT_LIMIT = 4194304                        # bytes; larger files are never posted
 COMMENT_LIMIT = 60000                           # bytes; GitHub rejects bodies over 65,536 characters
@@ -125,16 +122,6 @@ def accepted_files():
     return files
 
 
-def stamp(files, run):
-    """Append the publication context to every comment body, without evaluating any artifact as code."""
-    inspection = json.loads((OUT / "inspection.json").read_text())
-    mark = f"<!-- citygml-ci-context:{digest(inspection['context'])}:{run['id']}:{gh.attempt(run)} -->"
-    for name, path in files.items():
-        if name in MARKERS:
-            with path.open("a") as body:
-                body.write("\n" + mark + "\n")
-
-
 def post(repo, number, files, comments):
     """Upsert each comment independently by its fixed marker (mutually non-destructive)."""
     for name, marker in MARKERS.items():
@@ -143,8 +130,7 @@ def post(repo, number, files, comments):
         body = files[name].read_bytes().decode(errors="replace")
         if body.split("\n", 1)[0] != marker:
             fail(f"Unexpected comment marker in {files[name]}")
-        existing = gh.find_comment(comments, marker) or (
-            gh.find_comment(comments, FORMER[name]) if name in FORMER else None)
+        existing = gh.find_comment(comments, marker)
         updated = gh.upsert_comment(repo, number, body, existing)
         print(f"updated: {files[name]} (comment {existing['id']})" if updated else f"created: {files[name]}")
 
@@ -154,30 +140,32 @@ def run():
     analysis = analysis_run(repo, os.environ["ANALYSIS_RUN"])
     number = pr_number()
     pr = matching_pr(repo, number, analysis)
-    # A newer analysis of the same head supersedes this one: posting its detail comments
-    # would overwrite the newer run's comments with older results.
-    if not gh.is_latest(repo, pr, analysis):
-        fail("Superseded run")
-    # Checks attach to commits, not PRs: with two open PRs on one head nothing is posted.
-    heads = gh.open_heads(repo)[1]
-    if heads[pr["head"]["sha"]] != 1:
-        fail("Multiple open PRs share this head; checks cannot distinguish them")
     files = accepted_files()
-    # The event an analysis reads can carry an older PR than GitHub holds by the time it is
-    # posted (a PR reopened after main moved gets a new base). Run the analysis once more;
-    # a second stale result fails as before.
-    if json.loads((OUT / "inspection.json").read_text()).get("context") != context(pr):
+    inspection = json.loads((OUT / "inspection.json").read_text())
+    # The one judgement of the contract (A10): is this run's inspection the current report of
+    # the PR as GitHub holds it now?
+    pr, reason = currency(gh.api, repo, pr, {"context": inspection.get("context") or {"head": None},
+                                             "runId": analysis["id"], "runAttempt": gh.attempt(analysis)})
+    if reason == "report-stale":
+        # The event an analysis reads can carry an older PR than GitHub holds by the time it
+        # is posted (a PR reopened after main moved gets a new base). Run the analysis once
+        # more; a second stale result fails as before.
         if gh.attempt(analysis) == 1:
             gh.checked(f"/repos/{repo}/actions/runs/{analysis['id']}/rerun", "POST")
             print("The inspection describes an older state of the PR; the analysis runs again.")
             return
         fail("Inspection context is stale")
-    stamp(files, analysis)
+    if reason != "current":
+        # report-pending: a newer analysis of the same head supersedes this one; posting would
+        # overwrite its comments with older results. duplicate-head: checks attach to commits,
+        # not PRs, so nothing is posted. head-changed: the PR moved on.
+        fail({"report-pending": "Superseded run",
+              "duplicate-head": "Multiple open PRs share this head; checks cannot distinguish them"}.get(reason, reason))
     comments = gh.bot_comments(repo, number)
     post(repo, number, files, comments)
-    publish_review_report.publish(repo, pr, analysis, comments)
-    # The PR's ci-report judges the report just posted (the same check as review-report.yml).
-    if not check_review_report.verify(repo, pr, heads):
+    report = publish_review_report.publish(repo, pr, analysis, comments)
+    # The PR's ci-report judges the report just published (the same check as review-report.yml).
+    if not check_review_report.verify(repo, pr, report):
         fail("Report verification unavailable")
 
 

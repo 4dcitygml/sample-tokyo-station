@@ -43,29 +43,14 @@ https://github.com/4dcitygml/tools/blob/main/docs/exchange-contract.md
 
 ## 画像の権利
 <!-- 写真・テクスチャ画像を追加または差し替える PR では必須。画像を含まない PR では空欄のままで構いません。詳細: ../docs/ja/data-contribution-policy.md（§1〜§2）。 -->
-- [ ] 追加した画像は全て**自分自身で撮影した**ものである（他人の写真・Web や SNS 上の画像は不可）
-- [ ] 写真は公道など、適法な場所から撮影した
+- [ ] 追加した画像は全て**自分自身で撮影した**ものである（他人の写真・Web や SNS 上の画像は不可）。練習リポジトリに限り、その `docs/practice-photos/` フォルダの写真でもよい
+- [ ] 自分で撮影した写真は、公道など適法な場所から撮影した
 - [ ] 判別可能な顔・車のナンバープレート・表札・室内・生活の痕跡などが残っていない（必要な箇所はマスク・ぼかし済み）
 - [ ] 第三者の著作物（看板・ポスター・掲示物）が画像の主題になっていない
 - [ ] 追加したデータ・画像を[データ貢献ポリシー](../docs/ja/data-contribution-policy.md)の定めに従い **CC0 1.0** で提供することに同意し、写真については著作者人格権を行使しないことにも同意する（テクスチャ化には切り抜き・あおり補正・合成・再圧縮が伴います）
 
-## 出典・マニフェスト（source-update / schema / layout 等）
-<!-- 日常の修正では概要欄の根拠資料だけで足ります。以下の管理系 PR 種別では必須。 -->
-- Source-From:
-- Source-To:
-- Scope-Mesh:
-- Attribute-Family:
-- Allowed-Paths:
-- History-Manifest:
-- Provenance-Manifest:
-- Manifest-SHA256:
-- Plan-Issue:
-- Building-Count:
-- First-Building-ID:
-- Last-Building-ID:
-
 ## チェックリスト
-- [ ] 最新の main から作成し、同一メッシュ上の先行 PR と競合していない
+- [ ] 最新の main から作成し（または Update branch ボタンで最新化し）、同一メッシュ上の先行 PR と競合していない
 - [ ] 通常更新では **1 コミット = 1 建物 ID** になっている
 - [ ] 通常更新では同一 buildingID への修正を PR 内の複数コミットに分割していない
 - [ ] 各建物コミットの `Building:` 等のトレーラが実際に変更した buildingID と一致している
