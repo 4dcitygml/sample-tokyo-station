@@ -266363,7 +266363,7 @@
 			<bldg:class codeSpace="../../codelists/Building_class.xml">3002</bldg:class>
 			<bldg:usage codeSpace="../../codelists/Building_usage.xml">402</bldg:usage>
 			<bldg:measuredHeight uom="m">16.7</bldg:measuredHeight>
-			<bldg:storeysAboveGround>4</bldg:storeysAboveGround>
+			<bldg:storeysAboveGround>3</bldg:storeysAboveGround>
 			<bldg:storeysBelowGround>0</bldg:storeysBelowGround>
 			<bldg:lod0RoofEdge>
 				<gml:MultiSurface srsName="http://www.opengis.net/def/crs/EPSG/0/6697" srsDimension="3">
