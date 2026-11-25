@@ -36,6 +36,16 @@ Modifications from the original distribution (changes were made):
 Texture images: the JPG texture files under
 13101_chiyoda-ku_pref_2023_citygml_1_op/udx/bldg/53394611_bldg_6697_appearance/
 are part of the original PLATEAU distribution (CC BY 4.0, same attribution).
+Practice photos
+---------------
+docs/practice-photos/ holds four photos of building facades in this area for
+practising the texture editor, taken from Wikimedia Commons. Each is CC0 1.0
+or in the public domain; source, author, licence and changes (resized,
+metadata removed, some cropped to leave out the street level) are listed per
+photo in docs/practice-photos/CREDITS.md. In this practice repository they
+may be used in texture pull requests (docs/data-contribution-policy.md,
+section 2 item 5).
+
 Newly contributed images must follow docs/data-contribution-policy.md
 (rights, no identifiable persons / plates, removal-request contact).
 

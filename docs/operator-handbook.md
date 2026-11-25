@@ -71,7 +71,8 @@ report succeed.
 ### 1.4 Before marking Ready for review
 
 ```text
-[ ] All required checks are green on the head SHA of the final push (base freshness included)
+[ ] All required checks are green on the head SHA of the final push
+[ ] The PR is not out of date with main (GitHub's notice on the PR page; Update branch brings it up to date)
 [ ] Warnings and notices were read; where one is left as is, the reason is written in the PR
 [ ] After a churn notice, the minimal-diff version was applied and rechecked
 [ ] The current CI report is available for all reviewers (§3)
@@ -119,15 +120,17 @@ There is no separate human transcription, operator confirmation button, or
 operator-explanation required check.
 
 The machine report must match the current PR and CI run. Its generation or
-delivery failure cannot be replaced by a handwritten result. `ci-report` is
-judged in one place (`check_review_report.verify`): the poster calls it right after
-it published a report, and `review-report.yml` on every PR update, push to `main` and
-manual run; its summary names the reason: `current` (the report is valid and
-passes), `fix` or `system` (a current report that asks the proposer for a fix, or
-an incomplete run), `report-pending` (no report for the latest analysis yet),
-`report-stale` (the PR changed after the report), `report-unavailable` (no readable
-report), `workflow-change` (a `.github/` change without the `tooling` label),
-`duplicate-head`, `head-changed`. `analyze` and
+delivery failure cannot be replaced by a handwritten result. The report travels in
+the `ci-report` check run itself (its details on the Checks tab; the same text as one
+report comment on the PR, kept up to date). `ci-report` is judged in one place
+(`check_review_report.verify`): the poster calls it right after it published a report,
+and `review-report.yml` on every PR update, push to `main` and manual run. Its title
+says the verdict in the city's language and its summary ends with the reason:
+`current` (the report is the current one; the check is green when its state is pass,
+red for fix or system), `report-pending` (no report for the latest analysis yet),
+`report-stale` (the PR changed after the report), `workflow-change` (a `.github/`
+change without the `tooling` label), `duplicate-head`, `head-changed`,
+`unavailable` (the report could not be read or written). `analyze` and
 `ci-report` remain required checks; human approval requirements belong to GitHub.
 A CI rerun does not itself dismiss human approvals. GitHub's configured stale
 review, Code Owner and last-push rules decide whether approvals remain effective.
@@ -246,17 +249,18 @@ skipped. Respond by narrowing the scope and raising the priority.
 
 ### 6.6 `tooling` (updating the shared tools)
 
-A `tooling` PR changes `CITYGML_TOOLS_REF` in `.github/workflows/` to the
-immutable commit of a published `tools-v` release. That is the only tools
-version a city pins: the editing tools on residents' computers (the `hub-v`
-client) are not pinned by the city — their version comes from `4dcitygml/tools`
-releases, and the hub offers each newer version to its user. CI verifies the
-pin against the `tools-v` tags (Exchange Contract A11); any other change under
-`.github/` needs the maintainer label `tooling`. Nothing changes until the
-city merges the PR.
+A `tooling` PR changes `tools` in `4dcitygml.json` to the commit a published
+`tools-v` release tag points to. That is the only tools version a city pins:
+the editing tools on residents' computers (the `hub-v` client) are not pinned
+by the city — their version comes from `4dcitygml/tools` releases, and the hub
+offers each newer version to its user. CI verifies the new value against the
+`tools-v` tags and names the tag in its file-scope row (Exchange Contract A11);
+the PR itself is analysed by the tools its base pins. Any change under
+`.github/` needs the maintainer label `tooling`. Nothing changes until the city
+merges the PR.
 
 ```text
-[ ] The change touches only the CITYGML_TOOLS_REF lines in .github/workflows/ — no data, no documentation
+[ ] The change touches only `tools` (and, if needed, `min_hub`) in 4dcitygml.json — no data, no documentation
 [ ] CI's file-scope row passed (the new commit is a tools-v release; the tags API confirmed it)
 [ ] The explanation summarizes the release notes and starts with "no data change"
 [ ] If the release changes what CI expects from clients, min_hub in 4dcitygml.json was raised in the same PR
@@ -267,7 +271,7 @@ city merges the PR.
 
 The city's CI has two sides. The **analysis side** (`pr-analysis.yml`) runs
 from the PR's own branch. The **trusted side** (`pr-comment.yml`,
-`review-report.yml`, `pr-base-freshness.yml`, `pr-recheck.yml`, everything under
+`review-report.yml`, `pr-recheck.yml`, everything under
 `.github/scripts/`) runs from `main` regardless of what the PR contains — that is what keeps an
 untrusted PR from changing how its own report is posted and checked. So a PR
 cannot update both sides at once: while it is open, its analysis output is
@@ -279,7 +283,7 @@ The routine that follows from this:
    `.github/scripts/` in its own PR. Written so that it
    accepts both the current and the coming analysis output.
 2. **Analysis side second.** Then merge the change to `pr-analysis.yml` or the
-   `CITYGML_TOOLS_REF` pin that changes what the analyzer
+   `tools` pin in `4dcitygml.json` that changes what the analyzer
    produces (new artifact files, new inspection rows).
 
 If both sides go in one PR anyway, the trusted-side run of that PR fails once
@@ -301,7 +305,7 @@ the content:
   `<!--sec:reason-->` anchor) — the reason check reads that section.
 
 ```text
-[ ] Trusted-side change (pr-comment / review-report / pr-base-freshness / pr-recheck / .github/scripts) merged in its own PR before the analysis-side change
+[ ] Trusted-side change (pr-comment / review-report / pr-recheck / .github/scripts) merged in its own PR before the analysis-side change
 [ ] Trusted side accepts the current and the coming analysis output
 [ ] Label `tooling` applied; PR body in the template structure with the Summary of changes section filled
 [ ] After the analysis-side merge: the next data PR shows a green trusted-side run
@@ -325,7 +329,7 @@ workflow runs with one repository variable, `CITYGML_CI`:
 |---|---|
 | unset (every city repository) | every workflow runs as written |
 | `off` | automatic runs are skipped; `analyze` fails at its first step instead |
-| any value, manual dispatch | a workflow that offers `workflow_dispatch` runs: `pr-comment.yml` (publish a given analysis run again), `review-report.yml` and `pr-base-freshness.yml` (check every open PR) |
+| any value, manual dispatch | a workflow that offers `workflow_dispatch` runs: `pr-comment.yml` (publish a given analysis run again), `review-report.yml` (check every open PR) |
 
 `analyze` fails rather than skips because it is a required check and GitHub counts
 a skipped job as passed; with the switch off no pull request can pass the gate
@@ -373,7 +377,7 @@ edition is an output of merged content).
 [ ] Unresolved groups are left untouched, with a hold list and impact stated
 [ ] Release notes cover source, hashes, processing, ID unification, holds, and check results
 [ ] Tag, Pages, downloads, and check results point at the same commit
-[ ] Carried old-codeSpace values (codelists/<edition>/) are counted with carried_codespace_report.py and resolved or accepted by the official channel
+[ ] Carried old-codeSpace values (codelists/<edition>/) are counted with carried_codespace_report.py; those a pull request leaves unchanged stay plausibility warnings, resolved or accepted by the official channel (a value a pull request changes into a coded attribute outside its code list fails the blocking code-list check)
 [ ] The city's decision to adopt the release as official (date, publication channel) is recorded
 ```
 
@@ -397,7 +401,7 @@ new-year edition".
 ```text
 [ ] Candidates for unreferenced textures checked
 [ ] New official sources / annual editions and the check date recorded
-[ ] Pin of the shared CI tools inspected (CITYGML_TOOLS_REF) and min_hub reviewed; tooling PR decided
+[ ] Pin of the shared CI tools inspected (`tools` in 4dcitygml.json) and min_hub reviewed; tooling PR decided
 [ ] Organization settings reviewed: 2FA required, at least two maintainers, bypass list owners only, audit log read
 [ ] Sources, rights, and open questions for the release-target commit confirmed
 ```

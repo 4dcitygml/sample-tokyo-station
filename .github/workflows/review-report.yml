@@ -25,12 +25,9 @@ jobs:
   verify:
     # CI switch: the repository variable CITYGML_CI set to `off` skips automatic runs
     # (city-template docs/operator-handbook.md 6.8); a manual dispatch still runs.
-    # The `city-review` label is not part of the report context: adding or removing it
-    # leaves the report as valid as it was, so it starts no evaluation.
-    if: >-
-      (vars.CITYGML_CI != 'off' || github.event_name == 'workflow_dispatch') &&
-      !((github.event.action == 'labeled' || github.event.action == 'unlabeled') &&
-        github.event.label.name == 'city-review')
+    # A label outside the A9 labels (operator_explanation.LABELS) is not part of the report
+    # context, so an evaluation on its event finds the report as valid as it was.
+    if: vars.CITYGML_CI != 'off' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0

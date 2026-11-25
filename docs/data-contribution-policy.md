@@ -52,6 +52,13 @@ Translations for understanding: [Japanese](ja/data-contribution-policy.md),
    photographing building exteriors and allows *incidental* inclusion of
    signs, posters, and displays (in Japan: Arts. 46 and 30-2 of the Copyright
    Act). Avoid photos where such works are the main subject.
+5. **Practice repositories only**: in a practice repository (a
+   `sample-*-station` city), the photos in its `docs/practice-photos/` folder may
+   be used for texture pull requests instead of photos of your own (an
+   exception to item 1). They are CC0 or public domain; their source, author
+   and changes are listed in `docs/practice-photos/CREDITS.md`, and the street
+   level has been cropped out where people or vehicles were recognizable
+   (item 3).
 
 The texture editor asks for an explicit consent check when creating a PR
 (photos are substantial copyrighted works, so consent is explicit). The

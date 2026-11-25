@@ -8,7 +8,8 @@
 協働管理しています。**このリポジトリは必要時に初期状態へ戻す練習用サンドボックスです** —
 本番の都市データに参加する前に、編集ツールと PR の流れを安心して学べます。
 
-- **はじめかた（練習）**: ターミナルを開いて 1 行貼り付けるだけです。
+- **はじめかた（練習）**: ターミナルを開いて（開き方は
+  [はじめかた 1 節](docs/ja/getting-started.md#1-クイックスタート-ワンコマンド)）1 行貼り付けるだけです。
   macOS（ターミナル）:
   ```
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/4dcitygml/tools/install-v1/install/citygml.sh)" -- 4dcitygml/sample-tokyo-station
@@ -18,12 +19,16 @@
   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/4dcitygml/tools/install-v1/install/citygml.ps1))) 4dcitygml/sample-tokyo-station
   ```
   共有編集ツールが `4dcitygml/tools` からダウンロード・照合され、この都市に接続します。
-  リポジトリのクローンは不要です（自分用のコピーはツールが作ります）。2 回目からは
-  デスクトップのアイコンで開けます。この 1 行はインストールにも起動にも使え、もう一度
+  リポジトリのクローンは不要です（自分用のコピーはツールが作ります）。2 回目の開き方
+  （デスクトップのアイコンがあってもなくても）は
+  [はじめかた 7 節](docs/ja/getting-started.md#7-2-回目以降) を参照。この 1 行はインストールにも起動にも使え、もう一度
   実行しても安全です。新しい版はツールの画面の中で案内されます。2026 年 9 月より前に
   スターターキットで入れた方は、一度だけこの 1 行を実行し直してください（以前のものは
   そのまま残り、消しても構いません）。
   詳しい手順と、Git を直接使う方法は [はじめかた](docs/ja/getting-started.md) を参照。
+- **練習用写真**: `docs/practice-photos/` に、この地区の建物の外観写真 4 枚（CC0／パブリック
+  ドメイン）があります。テクスチャエディタの練習に使えます。出所は
+  [CREDITS.md](docs/practice-photos/CREDITS.md) を参照。
 - **データ出典・ライセンス**: `4dcitygml.json` の `attribution` / `license` を参照
   （3D都市モデル Project PLATEAU 千代田区（2023年度）／国土交通省 — CC BY 4.0）。
 - **見た目の設定**: `theme.json`（宣言的トークンのみ。変更は PR レビューを経由）。
@@ -53,8 +58,8 @@ CityGML 2.0 世代の旧 [FZKViewer](https://www.iai.kit.edu/english/1648.php)
 
 - **すべてのPRを管理者が確認**: どの提案も、管理者が確認してからマージします。
 - **手動リセット**: 管理者が確認語`RESET`を入力した場合だけ、データを`baseline`へ
-  戻すPRを開きます（履歴は残ります）。その際、データだけを変更しているオープン中の
-  提案は、案内を付けてクローズします。
+  戻すPRを用意します（履歴は残ります）。そのPRがマージされると、データだけを変更して
+  いるオープン中の提案は、案内を付けてクローズされます。
 - **リセット後は fork を同期**: このリポジトリを fork している場合、次の練習の前に
   GitHub 上で **Sync fork** → **Update branch** を押してください。同期しないと、
   リセットで戻された編集が次の PR の差分に混入し、コミット範囲検査で弾かれます。

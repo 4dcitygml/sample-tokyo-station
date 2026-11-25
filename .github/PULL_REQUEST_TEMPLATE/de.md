@@ -44,29 +44,14 @@ Maschinenvertrag: https://github.com/4dcitygml/tools/blob/main/docs/exchange-con
 
 ## Bildrechte
 <!-- Pflicht, sobald der PR Fotos / Texturbilder hinzufügt oder ersetzt; andernfalls leer lassen. Siehe ../docs/de/data-contribution-policy.md (§1-§2). -->
-- [ ] Jedes hinzugefügte Bild wurde **von mir selbst aufgenommen** (keine Fotos Dritter, keine Bilder aus dem Web oder aus sozialen Medien)
-- [ ] Jedes Foto wurde von einem rechtlich zulässigen Standort aus aufgenommen (z. B. öffentliche Straße)
+- [ ] Jedes hinzugefügte Bild wurde **von mir selbst aufgenommen** (keine Fotos Dritter, keine Bilder aus dem Web oder aus sozialen Medien); nur in einem Übungs-Repository darf es stattdessen aus dessen Ordner `docs/practice-photos/` stammen
+- [ ] Jedes eigene Foto wurde von einem rechtlich zulässigen Standort aus aufgenommen (z. B. öffentliche Straße)
 - [ ] Es sind keine erkennbaren Gesichter, Kfz-Kennzeichen, Namensschilder, Raum-Innenansichten oder ähnliche privatsphärerelevante Details verblieben (bei Bedarf maskiert / unkenntlich gemacht)
 - [ ] Kein fremdes Werk (Schild, Plakat, Anzeige) ist Hauptmotiv eines Bildes
 - [ ] Ich stelle die hinzugefügten Daten und Bilder gemäß der [Daten-Beitragsrichtlinie](../docs/de/data-contribution-policy.md) unter **CC0 1.0** bereit und verzichte bei Fotos zudem auf die Ausübung von Urheberpersönlichkeitsrechten (Zuschnitt, Perspektivkorrektur, Montage und Rekompression gehören zum Texturieren)
 
-## Quelle / Manifest (source-update / schema / layout usw.)
-<!-- Für alltägliche Korrekturen genügt der Beleg in der Zusammenfassung. Für die administrativen PR-Typen unten Pflicht. -->
-- Source-From:
-- Source-To:
-- Scope-Mesh:
-- Attribute-Family:
-- Allowed-Paths:
-- History-Manifest:
-- Provenance-Manifest:
-- Manifest-SHA256:
-- Plan-Issue:
-- Building-Count:
-- First-Building-ID:
-- Last-Building-ID:
-
 ## Checkliste
-- [ ] Vom aktuellen main erstellt, ohne Konflikt mit früheren PRs auf demselben Mesh
+- [ ] Vom aktuellen main erstellt (oder mit der Schaltfläche „Update branch“ aktualisiert), ohne Konflikt mit früheren PRs auf demselben Mesh
 - [ ] Bei normalen Updates gilt: **1 Commit = 1 Gebäude-ID**
 - [ ] Bei normalen Updates sind Korrekturen an derselben buildingID nicht auf mehrere Commits des PRs verteilt
 - [ ] Der `Building:`-Trailer (usw.) jedes Gebäude-Commits entspricht der tatsächlich geänderten buildingID

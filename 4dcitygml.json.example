@@ -13,5 +13,5 @@
   "attribution": "<data source attribution required by the license>",
   "license": "<license id>",
   "tools": "0804fc449e1cc517898e852878820397204c3541",
-  "min_hub": "<oldest editing-tools release this city accepts: hub-v1.5.0 or later>"
+  "min_hub": "<oldest editing-tools release this city accepts: hub-v2.0.0 or later>"
 }

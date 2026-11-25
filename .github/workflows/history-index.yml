@@ -35,7 +35,7 @@ env:
   # Same rule as pr-analysis.yml: CITYGML_TOOLS_REPO names your own audited mirror,
   # CITYGML_TOOLS_TOKEN (secret, read-only Contents) is needed only when it is private.
   CITYGML_TOOLS_REPO: ${{ vars.CITYGML_TOOLS_REPO || '4dcitygml/tools' }}
-  CITYGML_TOOLS_REF: a48d4658ec177c3ccfab6ffc24490fdb9dd3220f   # tools-v1.5.0
+  # The tools commit is the declaration's `tools` key (Exchange Contract A11), read below.
 
 jobs:
   build:
@@ -55,6 +55,15 @@ jobs:
         id: city
         run: |
           if [ -f 4dcitygml.json ]; then echo "configured=true" >> "$GITHUB_OUTPUT"; else echo "No 4dcitygml.json; nothing to publish."; fi
+      - name: Read the tools pin (tools in 4dcitygml.json)
+        if: steps.city.outputs.configured == 'true'
+        run: |
+          ref="$(jq -r '.tools // empty' 4dcitygml.json)"
+          if ! [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::4dcitygml.json pins no tools commit (tools: 40 hex)."
+            exit 1
+          fi
+          echo "CITYGML_TOOLS_REF=$ref" >> "$GITHUB_ENV"
       - name: Fetch shared logic (pinned)
         if: steps.city.outputs.configured == 'true'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -67,8 +76,8 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         if: steps.city.outputs.configured == 'true'
         with:
-          python-version: "3.12"
-      - run: python -m pip install --quiet "lxml==6.1.1" "shapely==2.1.2"
+          python-version-file: .citygml-ci/.python-version
+      - run: python -m pip install --quiet -r .citygml-ci/requirements-ci.txt   # the pinned tools' list
         if: steps.city.outputs.configured == 'true'
       - name: Assemble the site (repository content + history index)
         if: steps.city.outputs.configured == 'true'

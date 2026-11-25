@@ -106,7 +106,7 @@ approved, not how many approvals remain. See [review settings](review-settings.m
 | `layout` | One one-step subdivision of one parent mesh | One semantics-preserving commit | Re-aggregation check, ID / reference / size checks | Operator · handbook §6.3 |
 | `texture-gc` | One collection of unreferenced images | No building change | Proof of non-reference for all imageURIs, deletion list | Operator · handbook §6.4 |
 | `revert` | Undo of one building commit or one PR | Keeps the original unit | Target, reason, affected releases | Operator · handbook §6.5 |
-| `tooling` | One update of `CITYGML_TOOLS_REF` to a new `tools-v` release (CI verifies it against the tools tags) | No building change | Release notes, "no data change", `min_hub` if clients are affected | 4dcitygml proposes, operator verifies · handbook §6.6 |
+| `tooling` | One update of `tools` in `4dcitygml.json` to a new `tools-v` release (CI verifies it against the tools tags) | No building change | Release notes, "no data change", `min_hub` if clients are affected | 4dcitygml proposes, operator verifies · handbook §6.6 |
 | Docs / configuration | One documentation or configuration change (`docs/`, README, `4dcitygml.json`, theme, logo). Code is not accepted in a city repository (Exchange Contract A11) | No building change | Doc links, impact | Operator |
 | `identity-correction` | One mis-connection / ID fix event | Per the dedicated gate | Before/after IDs, evidence, extra approval | Bulk submitter · bulk-submission document |
 | `source-update` | 1 source transition × 1 mesh × 1 attribute family | One buildingID each | Provenance manifest, allowed paths, counts, sample | Bulk submitter · bulk-submission document |

@@ -11,7 +11,7 @@ On every submission and update, CI generates the data checks, the requests for f
 report with change / evidence / checks / impact / recommendation. Nobody has to take over a
 check or rewrite the report by hand.
 
-> The city requires hub-v1.5.0 or newer (`min_hub` in `4dcitygml.json`); an older hub can view
+> The city requires hub-v2.0.0 or newer (`min_hub` in `4dcitygml.json`); an older hub can view
 > the city but cannot send proposals. The hub shows the `ci-report` check and the inspection rows
 > of the shared report; the report text is read on the pull request in GitHub.
 

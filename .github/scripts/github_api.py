@@ -10,11 +10,10 @@ import json
 import os
 import urllib.error
 import urllib.request
-from collections import Counter
 from pathlib import Path
 
 import operator_explanation as contract
-from operator_explanation import bot, context, latest_run
+from operator_explanation import bot
 
 
 def api(path, method="GET", payload=None):
@@ -64,26 +63,6 @@ def attempt(run):
     return run.get("run_attempt", 1)
 
 
-# --- pull requests ---------------------------------------------------------------
-
-def open_heads(repo):
-    """Open PRs and how many of them share each head commit."""
-    prs = pages(f"/repos/{repo}/pulls?state=open")
-    return prs, Counter(pr["head"]["sha"] for pr in prs)
-
-
-def same_pr(repo, pr):
-    """The PR fetched again, and whether its review context is still the one given."""
-    current = checked(f"/repos/{repo}/pulls/{pr['number']}")
-    return current, context(current) == context(pr)
-
-
-def is_latest(repo, pr, run):
-    """Whether `run` is the latest analysis (id and attempt) of the PR's current head."""
-    latest = latest_run(api, repo, pr)
-    return (latest["id"], attempt(latest)) == (run["id"], attempt(run))
-
-
 # --- comments --------------------------------------------------------------------
 
 def bot_comments(repo, number):
@@ -91,10 +70,9 @@ def bot_comments(repo, number):
     return [c for c in pages(f"/repos/{repo}/issues/{number}/comments") if bot(c)]
 
 
-def find_comment(comments, marker, containing=""):
-    """The first comment that starts with `marker` (and carries `containing`), or None."""
-    return next((c for c in comments
-                 if str(c.get("body") or "").startswith(marker) and containing in str(c.get("body") or "")), None)
+def find_comment(comments, marker):
+    """The first comment that starts with `marker`, or None."""
+    return next((c for c in comments if str(c.get("body") or "").startswith(marker)), None)
 
 
 def upsert_comment(repo, number, body, existing):
@@ -108,25 +86,23 @@ def upsert_comment(repo, number, body, existing):
 
 # --- the ci-report check run ------------------------------------------------------
 
-def open_check(repo, sha, **fields):
+def open_check(repo, sha):
     """Start the `ci-report` check on a head commit; both trusted jobs report through it.
 
     One check run per head: an existing `ci-report` is reopened and updated in place,
     so the PR shows one row whose state is always the latest verdict. Creating a new
     run each time left earlier verdicts visible in other check suites.
     """
-    listing = checked(f"/repos/{repo}/commits/{sha}/check-runs?check_name=ci-report&filter=all&per_page=100")
-    mine = [c for c in listing.get("check_runs", []) if (c.get("app") or {}).get("slug") == "github-actions"]
-    if mine:
-        check = max(mine, key=lambda c: int(c["id"]))
-        checked(f"/repos/{repo}/check-runs/{check['id']}", "PATCH", {"status": "in_progress", **fields})
+    check = contract.report_check(api, repo, sha)
+    if check:
+        checked(f"/repos/{repo}/check-runs/{check['id']}", "PATCH", {"status": "in_progress"})
         return check
-    return checked(f"/repos/{repo}/check-runs", "POST",
-                   {"name": "ci-report", "head_sha": sha, "status": "in_progress", **fields})
+    return checked(f"/repos/{repo}/check-runs", "POST", {"name": "ci-report", "head_sha": sha, "status": "in_progress"})
 
 
-def close_check(repo, check, success, title, summary, **fields):
+def close_check(repo, check, result, title):
+    """Complete the check with a verdict of the contract's check_result and its localized title."""
     checked(f"/repos/{repo}/check-runs/{check['id']}", "PATCH", {
-        "status": "completed", "conclusion": "success" if success else "failure",
-        "output": {"title": title, "summary": summary}, **fields,
+        "status": "completed", "conclusion": result["conclusion"], "external_id": result["external_id"],
+        "output": {"title": title, "summary": result["summary"], "text": result["text"]},
     })
